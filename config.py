@@ -1,4 +1,4 @@
-DATA_DIR_PATH = "../CodeExamples"
+DATA_DIR_PATH = "./CodeExamples"
 
 MODELS_DIR_PATH = ""
 
@@ -6,7 +6,7 @@ DB_PATH = "./llms_responses.db"
 
 OPENAI_API_KEY = ""
 
-OLLAMA_HOST = ""
+OLLAMA_HOST = "http://localhost:11434"
 
 GROQ_API_KEY = ""
 

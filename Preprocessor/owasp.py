@@ -4,13 +4,10 @@ import re
 import random
 
 class OWASP:
-    def __init__(self):
-        self.data_dir = "../CodeExamples"
-        self.examples_dir = os.path.join(self.data_dir, 'owasp_code_examples')
-        self.groundTruth = os.path.join(self.data_dir, 'expectedresults-1.2.csv')
+    def __init__(self, data_dir):
+        self.examples_dir = os.path.join(data_dir, 'owasp_code_examples')
+        self.groundTruth = os.path.join(data_dir, 'expectedresults-1.2.csv')
         self.dummy_name_map = {}
-
-        self.df = self.load_and_process_examples()
 
     def remove_multiline_comments(self, java_code):
         pattern = re.compile(r'/\*.*?\*/', re.DOTALL)

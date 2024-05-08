@@ -2,16 +2,25 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 from langchain_groq import ChatGroq
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from LLMsInterface import config
+
+from LLMsInterface.ollama_utils import Ollama
 
 class LLMs:
-    def __init__(self, model_names):
+    def __init__(self):
         self.models = []
+
+    def initialize_models(self, model_names, config):
         for model_name in model_names:
             if "gpt" in model_name:
-                model = ChatOpenAI(model=model_name, temperature=0)
+                model = ChatOpenAI(api_key=config.OPENAI_API_KEY ,model=model_name, temperature=0)
+
             else:
-                # model = ChatOllama(model=model_name, temperature=0)
+                # host = Ollama(config.OLLAMA_HOST)
+                # if host.model_available(model_name):
+                #     model = ChatOllama(base_url=config.OLLAMA_HOST, model=model_name, temperature=0)
+                # else:
+                #     continue
+
                 model = ChatGroq(groq_api_key=config.GROQ_API_KEY, model=model_name, temperature=0)
                 
             self.models.append((model_name, model))

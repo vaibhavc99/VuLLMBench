@@ -4,3 +4,4 @@ ollama
 langchain
 langchain-openai
 langchain-groq
+scikit-learn

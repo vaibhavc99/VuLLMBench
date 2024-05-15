@@ -10,9 +10,12 @@ OLLAMA_HOST = "http://localhost:11434"
 
 GROQ_API_KEY = ""
 
-MODEL_LIST = [
+OPENAI_MODEL_LIST = [
     "gpt-3.5-turbo",
     "gpt-4",
+]
+
+OLLAMA_MODEL_LIST = [
     "llama3",
     "llama2",
     "codellama",

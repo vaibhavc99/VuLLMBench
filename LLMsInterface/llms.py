@@ -8,20 +8,26 @@ from LLMsInterface.ollama_utils import Ollama
 class LLMs:
     def __init__(self):
         self.models = []
+        self.ollama_checked = set()
 
     def initialize_models(self, model_names, config):
         for model_name in model_names:
-            if "gpt" in model_name:
+            if model_name in config.OPENAI_MODEL_LIST:
                 model = ChatOpenAI(api_key=config.OPENAI_API_KEY ,model=model_name, temperature=0)
 
-            else:
-                # host = Ollama(config.OLLAMA_HOST)
-                # if host.model_available(model_name):
-                #     model = ChatOllama(base_url=config.OLLAMA_HOST, model=model_name, temperature=0)
-                # else:
-                #     continue
+            elif model_name in config.OLLAMA_MODEL_LIST:
+                if model_name not in self.ollama_checked:
+                    self.ollama_checked.add(model_name)
+                    host = Ollama(config.OLLAMA_HOST)
+                    if not host.model_available(model_name):
+                        continue
+                model = ChatOllama(base_url=config.OLLAMA_HOST, model=model_name, temperature=0)
 
+            elif model_name in config.GROQ_MODEL_LIST: 
                 model = ChatGroq(groq_api_key=config.GROQ_API_KEY, model=model_name, temperature=0)
+
+            else:
+                continue
                 
             self.models.append((model_name, model))
 

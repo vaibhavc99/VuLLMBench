@@ -2,12 +2,16 @@ import os
 import pandas as pd
 import re
 import random
+import sqlite3
 
 class OWASP:
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, useCache=True):
         self.examples_dir = os.path.join(data_dir, 'owasp_code_examples')
         self.groundTruth = os.path.join(data_dir, 'expectedresults-1.2.csv')
         self.dummy_name_map = {}
+        self.db_path = os.path.join(data_dir, 'owasp_cache.db')
+        self.cache_table = 'processed_examples'
+        self.useCache = useCache
 
     def remove_multiline_comments(self, java_code):
         pattern = re.compile(r'/\*.*?\*/', re.DOTALL)
@@ -51,6 +55,34 @@ class OWASP:
         owasp_df = pd.read_csv(self.groundTruth, index_col='test_name')
         owasp_df.columns = owasp_df.columns.str.strip()
 
+        if self.useCache:
+            if not self.is_cache_initialized():
+                self.process_and_cache_examples(owasp_df)
+            return self.load_cached_examples()
+        else:
+            return self.process_examples(owasp_df)
+
+    def is_cache_initialized(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute(f'''
+            SELECT name FROM sqlite_master WHERE type='table' AND name='{self.cache_table}';
+        ''')
+        
+        table_exists = cursor.fetchone() is not None
+        conn.close()
+        
+        return table_exists
+
+    def process_and_cache_examples(self, owasp_df: pd.DataFrame):
+        df = self.process_examples(owasp_df)
+        
+        conn = sqlite3.connect(self.db_path)
+        df.to_sql(self.cache_table, conn, if_exists='replace', index=True)
+        conn.close()
+
+    def process_examples(self, owasp_df: pd.DataFrame):
         code_snippets = {}
         file_list = os.listdir(self.examples_dir)
 
@@ -71,13 +103,21 @@ class OWASP:
                 code_snippets[test_name] = java_code
 
         owasp_df['code_snippet'] = owasp_df.index.map(code_snippets)
-
         return owasp_df[['category', 'real_vulnerability', 'cwe', 'code_snippet']]
+
+    def load_cached_examples(self):
+        conn = sqlite3.connect(self.db_path)
+        query = f'''
+            SELECT * FROM {self.cache_table};
+        '''
+        cached_df = pd.read_sql_query(query, conn, index_col='test_name')
+        conn.close()
+        
+        return cached_df
 
 
 if __name__ == "__main__":
-    owasp = OWASP()
-    df = owasp.df
+    data_dir = '../CodeExamples'
+    owasp = OWASP(data_dir)
+    df = owasp.load_and_process_examples()
     print(df.head())
-
-    df.head().to_csv("../CodeExamples/owasp_processed/examples1.csv")

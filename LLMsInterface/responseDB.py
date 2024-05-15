@@ -26,7 +26,7 @@ class LLMResponseDB:
     def insert_response(self, table, test_name, model_name, response):
         self.ensure_table_exists(table)
         column = f'"{model_name}"'
-        self.ensure_column_exists(table, model_name)
+        self.ensure_column_exists(table, column)
         
         self.cursor.execute(f"SELECT {column} FROM {table} WHERE test_name = ?", (test_name,))
         if self.cursor.fetchone() is None:
@@ -39,10 +39,14 @@ class LLMResponseDB:
     def response_exists(self, table, test_name, model_name):
         try:
             column = f'"{model_name}"'
-            self.cursor.execute(f"SELECT {column} FROM {table} WHERE test_name = ?", (test_name,))
-            result = self.cursor.fetchone()
-            return result is not None and result[0] is not None
-        except:
+            if self.column_exists(table, column):
+                self.cursor.execute(f"SELECT {column} FROM {table} WHERE test_name = ?", (test_name,))
+                result = self.cursor.fetchone()
+                return result is not None and result[0] is not None
+            else:
+                return False
+        except Exception as e:
+            print(e)
             return False
     
     def get_all_responses(self, table):
@@ -58,7 +62,7 @@ if __name__ == '__main__':
     db_path = '../llms_responses.db'
     table_name = 'simple'
     db = LLMResponseDB(db_path)
-    # print(db.response_exists("simple", "BenchmarkTest00001","llama3-8b-8192"))
+    # print(db.response_exists("simple", "BenchmarkTest00001","llama3-70b-8192"))
     # db.ensure_table_exists(table_name)
     all_responses = db.get_all_responses(table_name)
     db.close()

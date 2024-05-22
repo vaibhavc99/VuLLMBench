@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import random
 import sqlite3
+import hashlib
 
 class OWASP:
     def __init__(self, data_dir, useCache=True):
@@ -12,6 +13,7 @@ class OWASP:
         self.db_path = os.path.join(data_dir, 'owasp_cache.db')
         self.cache_table = 'processed_examples'
         self.useCache = useCache
+        self.processing_options = None
 
     def remove_multiline_comments(self, java_code):
         pattern = re.compile(r'/\*.*?\*/', re.DOTALL)
@@ -50,8 +52,24 @@ class OWASP:
         names = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']
         adjs = ['Quick', 'Bright', 'Silent', 'Clever', 'Brave']
         return f"{random.choice(adjs)}{random.choice(names)}{random.randint(100, 999)}"
+    
+    def obfuscate(self, java_code):
+        patterns = {
+            'method': r'\b(?:public|protected|private)\s+\w+\s+(\w+)\(',
+            'variable': r'\b(?:int|float|String|boolean)\s+(\w+)[;=]'
+        }
+        obfuscated_code = java_code
+        for type_, pattern in patterns.items():
+            matches = re.findall(pattern, java_code)
+            unique_matches = set(matches)
 
-    def load_and_process_examples(self):
+            for match in unique_matches:
+                obfuscated_name = hashlib.md5(match.encode()).hexdigest()[:8]
+                obfuscated_code = re.sub(r'\b' + match + r'\b', obfuscated_name, obfuscated_code)
+
+        return obfuscated_code
+
+    def load_and_process_examples(self, processing_options=None):
         owasp_df = pd.read_csv(self.groundTruth, index_col='test_name')
         owasp_df.columns = owasp_df.columns.str.strip()
 
@@ -60,6 +78,7 @@ class OWASP:
                 self.process_and_cache_examples(owasp_df)
             return self.load_cached_examples()
         else:
+            self.processing_options = processing_options if processing_options else {'remove_multiline_comments': True}
             return self.process_examples(owasp_df)
 
     def is_cache_initialized(self):
@@ -92,11 +111,7 @@ class OWASP:
                 with open(file_path, 'r', encoding='utf-8') as file:
                     java_code = file.read()
 
-                java_code = self.remove_multiline_comments(java_code)
-                java_code = self.remove_import_statements(java_code)
-                java_code = self.remove_package_declarations(java_code)
-                java_code = self.replace_benchmark_names(java_code)
-                java_code = self.replace_cwe_names(java_code)
+                java_code = self.apply_processing_steps(java_code)
 
                 # Assuming the file name without extension matches the test name
                 test_name = os.path.splitext(filename)[0]
@@ -104,6 +119,22 @@ class OWASP:
 
         owasp_df['code_snippet'] = owasp_df.index.map(code_snippets)
         return owasp_df[['category', 'real_vulnerability', 'cwe', 'code_snippet']]
+
+    def apply_processing_steps(self, java_code):
+        processing_steps = {
+            'remove_multiline_comments': self.remove_multiline_comments,
+            'remove_import_statements': self.remove_import_statements,
+            'remove_package_declarations': self.remove_package_declarations,
+            'replace_benchmark_names': self.replace_benchmark_names,
+            'replace_cwe_names': self.replace_cwe_names,
+            'obfuscate': self.obfuscate
+        }
+
+        for step, method in processing_steps.items():
+            if self.processing_options.get(step, False):
+                java_code = method(java_code)
+        
+        return java_code
 
     def load_cached_examples(self):
         conn = sqlite3.connect(self.db_path)
@@ -118,6 +149,14 @@ class OWASP:
 
 if __name__ == "__main__":
     data_dir = '../CodeExamples'
-    owasp = OWASP(data_dir)
-    df = owasp.load_and_process_examples()
+    processing_options = {
+        'remove_multiline_comments': True,
+        'remove_import_statements': True,
+        'remove_package_declarations': True,
+        'replace_benchmark_names': False,
+        'replace_cwe_names': False,
+        'obfuscate': False
+    }
+    owasp = OWASP(data_dir, useCache=False)
+    df = owasp.load_and_process_examples(processing_options)
     print(df.head())

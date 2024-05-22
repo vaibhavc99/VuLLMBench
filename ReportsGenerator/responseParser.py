@@ -12,8 +12,9 @@ class ResponseParser:
         try:
             parts = response.split(self.delimiter)
             for part in parts:
-                key, value = part.strip().split(':', 1)
-                parsed_data[key.strip()] = value.strip()
+                if ':' in part:
+                    key, value = part.strip().split(':', 1)
+                    parsed_data[key.strip()] = value.strip()
 
         except ValueError as e:
             print(f"Error parsing response: {response}. Error: {e}")

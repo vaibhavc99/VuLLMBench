@@ -54,6 +54,15 @@ class LLMResponseDB:
         column_names = [description[0] for description in self.cursor.description][1:]
         rows = self.cursor.fetchall()
         return {row[0]: dict(zip(column_names, row[1:])) for row in rows}
+    
+    def get_responses_by_model(self, table, model_name):
+        column = f'"{model_name}"'
+        if self.column_exists(table, column):
+            self.cursor.execute(f"SELECT test_name, {column} FROM {table}")
+            rows = self.cursor.fetchall()
+            return {row[0]: row[1] for row in rows if row[1] is not None}
+        else:
+            return {}
 
     def close(self):
         self.db.close()

@@ -11,8 +11,11 @@ class VulnerabilityEvaluator:
         self.true_df = true_df
 
     def extract_cwe(self, description):
-        match = re.search(r'CWE-(\d+)', description)
-        return int(match.group(1)) if match else None
+        match = re.search(r'(?i)cwe-?(\d+)|\b(\d+)\b', description)
+        if match:
+            cwe_number = match.group(1) if match.group(1) else match.group(2)
+            return int(cwe_number)
+        return None
 
     def evaluate_by_model(self):
         results = {}

@@ -10,29 +10,27 @@ import logging
 import json
 
 class Controller:
-    def __init__(self, preprocessor:OWASP, prompt_generator:PromptGenerator, llm_interface:LLMs, response_parser:ResponseParser, db:LLMResponseDB, useCache:bool=True):
-        self.preprocessor = preprocessor
-        self.prompt_generator = prompt_generator
-        self.llm_interface = llm_interface
-        self.response_parser = response_parser
+    def __init__(self, data_dir_path:str, useCache:bool=True):
+        self.preprocessor = OWASP(data_dir_path)
+        self.prompt_generator = PromptGenerator()
+        self.llm_interface = LLMs(config)
+        self.response_parser = ResponseParser()
+        self.db = LLMResponseDB(config.DB_PATH)
         self.examples = None
-        self.db = db
         self.useCache = useCache
         logging.basicConfig(level=logging.INFO)
 
-    def load_examples(self):
-        self.examples = self.preprocessor.load_and_process_examples().head(5)
+    def load_examples(self, processing_options=None):
+        self.examples = self.preprocessor.load_and_process_examples(processing_options).head(10)
         logging.info(f"Loaded {len(self.examples)} OWASP examples.")
 
-    def get_prompt(self, code_snippet, prompt_type):
+    def get_prompt(self, code_snippet:str, prompt_type:str):
         return self.prompt_generator.generate_prompt(code_snippet, prompt_type)
     
-    def send_to_llm(self, prompt_type):
+    def send_to_llm(self, model_names:list, prompt_type:str):
         if self.examples is None:
             logging.error("Examples not loaded.")
             return
-        
-        model_names = [config.GROQ_MODEL_LIST[0], config.GROQ_MODEL_LIST[1]]
         
         for index, row in self.examples.iterrows():
             prompt = self.get_prompt(row["code_snippet"], prompt_type)
@@ -43,20 +41,21 @@ class Controller:
                     models_to_query.append(model_name)
 
             if models_to_query:
-                self.llm_interface.initialize_models(models_to_query, config)
-                responses = self.llm_interface.ask_llms(prompt)
+                responses = self.llm_interface.ask_llms(prompt, models_to_query)
+                # print(responses)
 
                 for model_name, response in responses.items():
                     self.db.insert_response(prompt_type, index, model_name, response)
                     logging.info(f"A response by {model_name} for {index} is stored in database.")
-                
+
             else:
                 logging.info(f"All responses for {index} already exist. Skipping LLM calls.")
 
-    def generate_reports(self, prompt_type):
+    def generate_reports(self, prompt_type:str):
         logging.info("Generating reports based on LLM responses.")
 
         responses = self.db.get_all_responses(prompt_type)
+        # print({k: responses[k] for k in list(responses)[:5]})
         df = self.response_parser.responses_to_dataframe(responses, prompt_type)
 
         evaluator = VulnerabilityEvaluator(df, self.examples)
@@ -71,17 +70,14 @@ class Controller:
 if __name__ == '__main__':
     # prompt_types = ["simple", "vulnerability_specific", "explanatory_insights", "solution_oriented"]
     prompt_types = ["simple"]
-    preprocessor = OWASP(config.DATA_DIR_PATH)
-    prompt_generator = PromptGenerator()
-    llm_interface = LLMs()
-    response_parser = ResponseParser()
-    responseDB = LLMResponseDB(config.DB_PATH)
-
-    controller = Controller(preprocessor, prompt_generator, llm_interface, response_parser, responseDB)
+    model_names = [config.GROQ_MODEL_LIST[0]]
+    
+    controller = Controller(config.DATA_DIR_PATH)
     controller.load_examples()
 
     for prompt_type in prompt_types:
-        controller.send_to_llm(prompt_type)
+        controller.send_to_llm(model_names,prompt_type)
         controller.generate_reports(prompt_type)
 
-    responseDB.close()
+    controller.db.close()
+    logging.info("Done.")

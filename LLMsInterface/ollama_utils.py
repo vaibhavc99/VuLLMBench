@@ -3,7 +3,7 @@ import logging
         
 logging.basicConfig(level=logging.INFO)
 
-class Ollama:
+class OllamaUtils:
     def __init__(self, base_url):
         self.client = ollama.Client(base_url)
 
@@ -34,6 +34,6 @@ class Ollama:
                 return False
 
 if __name__ == '__main__':  
-    ol = Ollama("http://localhost:11434")
+    ol = OllamaUtils("http://localhost:11434")
     # ol.is_running()
     ol.model_available('llama3')

@@ -1,4 +1,5 @@
 import os
+import shutil
 import pandas as pd
 import re
 import random
@@ -8,12 +9,14 @@ import hashlib
 class OWASP:
     def __init__(self, data_dir, useCache=True):
         self.examples_dir = os.path.join(data_dir, 'owasp_code_examples')
+        self.obfuscated_dir = os.path.join(data_dir, 'owasp_code_examples_obfuscated')
         self.groundTruth = os.path.join(data_dir, 'expectedresults-1.2.csv')
         self.dummy_name_map = {}
         self.db_path = os.path.join(data_dir, 'owasp_cache.db')
         self.cache_table = 'processed_examples'
         self.useCache = useCache
         self.processing_options = None
+        self.setup_obfuscated_dir()
 
     def remove_multiline_comments(self, java_code):
         pattern = re.compile(r'/\*.*?\*/', re.DOTALL)
@@ -31,7 +34,7 @@ class OWASP:
         return '\n'.join(cleaned_lines)
 
     def replace_benchmark_names(self, java_code):
-        pattern = re.compile(r'\b(BenchmarkTest\d{5}|owasp|benchmark)\b', re.IGNORECASE)
+        pattern = re.compile(r'\b(owasp|benchmark)\b', re.IGNORECASE)
         return pattern.sub(self.replace_with_dummy, java_code)
     
     def replace_cwe_names(self, java_code):
@@ -55,8 +58,7 @@ class OWASP:
     
     def obfuscate(self, java_code):
         patterns = {
-            'method': r'\b(?:public|protected|private)\s+\w+\s+(\w+)\(',
-            'variable': r'\b(?:int|float|String|boolean)\s+(\w+)[;=]'
+            'variable': r'\b(?:int|float|double|char|byte|short|long|String|boolean|List|Map|Set|ArrayList|HashMap)\s+(\w+)[;=]'
         }
         obfuscated_code = java_code
         for type_, pattern in patterns.items():
@@ -112,6 +114,7 @@ class OWASP:
                     java_code = file.read()
 
                 java_code = self.apply_processing_steps(java_code)
+                new_filename, java_code = self.rename_class_and_file(filename, java_code)
 
                 # Assuming the file name without extension matches the test name
                 test_name = os.path.splitext(filename)[0]
@@ -135,6 +138,31 @@ class OWASP:
                 java_code = method(java_code)
         
         return java_code
+
+    def rename_class_and_file(self, filename, java_code):
+        class_name_pattern = re.compile(r'\bBenchmarkTest\d{5}\b')
+        matches = class_name_pattern.findall(java_code)
+        new_class_name = None
+        
+        for match in matches:
+            if match not in self.dummy_name_map:
+                self.dummy_name_map[match] = self.generate_random_name()
+            new_class_name = self.dummy_name_map[match]
+            java_code = java_code.replace(match, new_class_name)
+        
+        if new_class_name:
+            new_filename = f"{new_class_name}.java"
+            original_path = os.path.join(self.examples_dir, filename)
+            obfuscated_path = os.path.join(self.obfuscated_dir, new_filename)
+            shutil.copyfile(original_path, obfuscated_path)
+            with open(obfuscated_path, 'w', encoding='utf-8') as file:
+                file.write(java_code)
+            return new_filename, java_code
+        return filename, java_code
+
+    def setup_obfuscated_dir(self):
+        if not os.path.exists(self.obfuscated_dir):
+            os.makedirs(self.obfuscated_dir)
 
     def load_cached_examples(self):
         conn = sqlite3.connect(self.db_path)

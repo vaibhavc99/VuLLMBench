@@ -23,24 +23,31 @@ class LLMResponseDB:
         columns = [info[1] for info in self.cursor.fetchall()]
         return column.strip('"') in columns
 
-    def insert_response(self, table, test_name, model_name, response):
+    def insert_response(self, table, test_name, prompt, model_name, response):
         self.ensure_table_exists(table)
-        column = f'"{model_name}"'
-        self.ensure_column_exists(table, column)
+        model_column = f'"{model_name}"'
+        prompt_str = f"SYSTEM_PROMPT: {prompt[0].content}\nUSER_PROMPT: {prompt[1].content}"
+
+        self.ensure_column_exists(table, "prompt")
+        self.ensure_column_exists(table, model_column)
         
-        self.cursor.execute(f"SELECT {column} FROM {table} WHERE test_name = ?", (test_name,))
-        if self.cursor.fetchone() is None:
-            self.cursor.execute(f"INSERT INTO {table} (test_name, {column}) VALUES (?, ?)", (test_name, response))
+        self.cursor.execute(f"SELECT {model_column} FROM {table} WHERE test_name = ?", (test_name,))
+
+        row = self.cursor.fetchone()
+        if row is None:
+            self.cursor.execute(f"INSERT INTO {table} (test_name, prompt, {model_column}) VALUES (?, ?, ?)", (test_name, prompt_str, response))
         else:
-            self.cursor.execute(f"UPDATE {table} SET {column} = ? WHERE test_name = ?", (response, test_name))
+            if row[0] is None:
+                self.cursor.execute(f"UPDATE {table} SET prompt = ? WHERE test_name = ?", (prompt_str, test_name))
+            self.cursor.execute(f"UPDATE {table} SET {model_column} = ? WHERE test_name = ?", (response, test_name))
 
         self.db.commit()
     
     def response_exists(self, table, test_name, model_name):
         try:
-            column = f'"{model_name}"'
-            if self.column_exists(table, column):
-                self.cursor.execute(f"SELECT {column} FROM {table} WHERE test_name = ?", (test_name,))
+            model_column = f'"{model_name}"'
+            if self.column_exists(table, model_column):
+                self.cursor.execute(f"SELECT {model_column} FROM {table} WHERE test_name = ?", (test_name,))
                 result = self.cursor.fetchone()
                 return result is not None and result[0] is not None
             else:
@@ -56,9 +63,9 @@ class LLMResponseDB:
         return {row[0]: dict(zip(column_names, row[1:])) for row in rows}
     
     def get_responses_by_model(self, table, model_name):
-        column = f'"{model_name}"'
-        if self.column_exists(table, column):
-            self.cursor.execute(f"SELECT test_name, {column} FROM {table}")
+        model_column = f'"{model_name}"'
+        if self.column_exists(table, model_column):
+            self.cursor.execute(f"SELECT test_name, {model_column} FROM {table}")
             rows = self.cursor.fetchall()
             return {row[0]: row[1] for row in rows if row[1] is not None}
         else:

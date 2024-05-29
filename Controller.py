@@ -21,7 +21,7 @@ class Controller:
         logging.basicConfig(level=logging.INFO)
 
     def load_examples(self, processing_options=None):
-        self.examples = self.preprocessor.load_and_process_examples(processing_options).head(10)
+        self.examples = self.preprocessor.load_and_process_examples(processing_options)
         logging.info(f"Loaded {len(self.examples)} OWASP examples.")
 
     def get_prompt(self, code_snippet:str, prompt_type:str):
@@ -45,7 +45,7 @@ class Controller:
                 # print(responses)
 
                 for model_name, response in responses.items():
-                    self.db.insert_response(prompt_type, index, model_name, response)
+                    self.db.insert_response(prompt_type, index, prompt, model_name, response)
                     logging.info(f"A response by {model_name} for {index} is stored in database.")
 
             else:

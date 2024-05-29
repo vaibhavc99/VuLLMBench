@@ -23,6 +23,19 @@ Code Snippet:
 {code}
 """
 
+VUL_NAME_SYSTEM_PROMPT = """
+You are an assistant with expertise in identifying and explaining security vulnerabilities within code samples.
+When providing a response, please use the following format exclusively:
+'Vulnerability: <True or False> | Vulnerability Name: <Name or Title of Vulnerability>'.
+
+If there are no vulnerabilities, enter "N/A" in the other fields. Do not include any additional information in the response.
+"""
+
+VUL_NAME_USER_PROMPT = """
+Does the following code contain any vulnerabilities? If so, provide the name or title of the vulnerability.
+{code}
+"""
+
 # Explanatory-Insights Prompt
 EXPL_SYSTEM_PROMPT = """
 You are an assistant with deep expertise in identifying, analyzing, and explaining security vulnerabilities within code samples.

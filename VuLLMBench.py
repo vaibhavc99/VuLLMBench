@@ -25,19 +25,23 @@ def run_controller(args, paths, config=None):
     if config:
         use_cache = config['General']['use_cache']
         prompt_type = config['General']['prompt_type']
+        table_name = f"{prompt_type}_prompt_{args.experiment}"
         model_names = [name.strip() for name in config['LLM']['model_names'].split(',')]
         processing_options = {key: config['Preprocessing Options'].getboolean(key)
-                                for key in config['Preprocessing Options']}
+                              for key in config['Preprocessing Options']}
     else:
         use_cache = not args.no_cache
         prompt_type = args.prompt_type
+        table_name = f"{prompt_type}_prompt_default"
         model_names = args.model_names
-        processing_options = None
+        processing_options = {option: False for option in PROCESSING_OPTIONS}
+        for option in args.processing_options:
+            processing_options[option] = True
 
-    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache)
+    controller = Controller(data_dir_path=paths['DataPath'], table_name=table_name, useCache=use_cache)
     controller.load_examples(processing_options)
-    controller.send_to_llm(model_names,prompt_type)
-    controller.generate_reports(prompt_type)
+    controller.send_to_llm(model_names, prompt_type)
+    # controller.generate_reports(prompt_type)
     controller.db.close()
 
 def load_paths(args):
@@ -73,6 +77,7 @@ def parse_arguments():
     parser.add_argument('-p', '--prompt_type', choices=['simple', 'vulnerability_specific', 'explanatory_insights', 'solution_oriented'], help='Type of prompt to use for LLM queries', default='simple')
     parser.add_argument('--no_cache', action='store_true', help='Do not use cache')
     parser.add_argument('-e', '--experiment', help='Name of the experiment to execute. The name must correspond to one directory in the Evaluation directory which contains a configuration file')
+    parser.add_argument('--processing_options', nargs='*', choices=PROCESSING_OPTIONS, help='Processing options to apply for the examples', default=['remove_multiline_comments'])
 
     return parser.parse_args()
 
@@ -90,4 +95,12 @@ def configure_logging(config=None):
         logging.basicConfig(level=logging.INFO)
 
 if __name__ == '__main__':
+    PROCESSING_OPTIONS = [
+        'obfuscate_code',
+        'remove_multiline_comments',
+        'remove_import_statements',
+        'remove_package_declarations',
+        'replace_benchmark_names',
+        'replace_cwe_names'
+    ]
     main()

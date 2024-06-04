@@ -1,33 +1,48 @@
+import javalang
 import re
-import os
 import hashlib
 
-def obfuscate_java_code(java_file_path):
-    with open(java_file_path, 'r') as file:
-        code = file.read()
+def _rename(name, prefix):
+    return f'{prefix}_{hashlib.md5(name.encode()).hexdigest()[:8]}'
 
-    patterns = {
-        'class': r'\bclass\s+(\w+)',
-        'method': r'\b(?:public|protected|private)\s+\w+\s+(\w+)\(',
-        'variable': r'\b(?:int|float|String|boolean)\s+(\w+)[;=]'
-    }
+def obfuscate(source_code, classes=True, methods=True, variables=True, parameters=True):
+    tree = javalang.parse.parse(source_code)
+    
+    modified_code = source_code
+    tokens = list(javalang.tokenizer.tokenize(source_code))
+    modifications = {}
+    new_class_name = None
 
-    obfuscated_code = code
+    for path, node in tree:
+        if isinstance(node, javalang.tree.ClassDeclaration) and classes:
+            testcase_name = re.search(r'BenchmarkTest(\d{5})', node.name)
+            if testcase_name:
+                testcase_number = testcase_name.group(1)
+                new_class_name = f'Class{testcase_number}'
+                modifications[node.name] = new_class_name
+            else:
+                modifications[node.name] = f'Class_{hashlib.md5(node.name.encode()).hexdigest()[:8]}'
 
-    for type_, pattern in patterns.items():
-        matches = re.findall(pattern, code)
-        unique_matches = set(matches)
+        elif isinstance(node, javalang.tree.MethodDeclaration) and methods:
+            modifications[node.name] = _rename(node.name, 'method')
+            
+        elif isinstance(node, javalang.tree.VariableDeclarator) and variables:
+            modifications[node.name] = _rename(node.name, 'var')
 
-        for match in unique_matches:
-            obfuscated_name = hashlib.md5(match.encode()).hexdigest()[:8]  # Simple obfuscation
-            obfuscated_code = re.sub(r'\b' + match + r'\b', obfuscated_name, obfuscated_code)
+        elif isinstance(node, javalang.tree.FormalParameter) and parameters:
+            modifications[node.name] = _rename(node.name, 'param')
+    
+    for token in tokens:
+        if token.value in modifications:
+            modified_code = re.sub(r'\b' + re.escape(token.value) + r'\b', modifications[token.value], modified_code)
+    
+    return modified_code, new_class_name
 
+if __name__ == '__main__':
+    with open('./BenchmarkTest01533.java', 'r') as file:
+        java_code = file.read()
 
-    obfuscated_file_path = java_file_path.replace('.java', '_obfuscated.java')
-    with open(obfuscated_file_path, 'w') as file:
-        file.write(obfuscated_code)
+    modified_code, new_class_name = obfuscate(java_code, classes=True, methods=True, variables=True, parameters=True)
 
-    print(f"Obfuscated code saved to: {obfuscated_file_path}")
-
-
-obfuscate_java_code('./BenchmarkTest00001.java')
+    with open(f'./{new_class_name}.java', 'w') as file:
+        file.write(modified_code)

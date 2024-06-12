@@ -23,12 +23,23 @@ def main():
 
 def run_controller(args, paths, config=None):
     if config:
-        use_cache = config['General']['use_cache']
+        use_cache = config.getboolean('General', 'use_cache')
         prompt_type = config['General']['prompt_type']
         table_name = f"{prompt_type}_prompt_{args.experiment}"
         model_names = [name.strip() for name in config['LLM']['model_names'].split(',')]
         processing_options = {key: config['Preprocessing Options'].getboolean(key)
                               for key in config['Preprocessing Options']}
+        
+        if 'Data Stratification' in config:
+            stratification_options = {
+                'stratify': config.getboolean('Data Stratification', 'stratify'),
+                'stratify_cols': [col.strip() for col in config['Data Stratification']['stratify_by'].split(',')],
+                'test_size': config.getfloat('Data Stratification', 'test_size'),
+                'random_state': config.getint('Data Stratification', 'random_state')
+            }
+        else:
+            stratification_options = None
+
     else:
         use_cache = not args.no_cache
         prompt_type = args.prompt_type
@@ -37,11 +48,13 @@ def run_controller(args, paths, config=None):
         processing_options = {option: False for option in PROCESSING_OPTIONS}
         for option in args.processing_options:
             processing_options[option] = True
+        stratification_options = None
 
-    controller = Controller(data_dir_path=paths['DataPath'], table_name=table_name, useCache=use_cache)
-    controller.load_examples(processing_options)
+
+    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, table_name=table_name)
+    controller.load_examples(processing_options, stratification_options)
     controller.send_to_llm(model_names, prompt_type)
-    # controller.generate_reports(prompt_type)
+    controller.generate_reports(prompt_type)
     controller.db.close()
 
 def load_paths(args):

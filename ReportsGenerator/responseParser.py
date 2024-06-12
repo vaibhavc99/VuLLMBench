@@ -1,10 +1,32 @@
 import pandas as pd
 
 class ResponseParser:
+    """
+    A class for parsing and processing LLM response data.
+
+    Parameters:
+    - delimiter (str): The delimiter used to separate key-value pairs in the response string.
+
+    Attributes:
+    - delimiter (str): The delimiter used to separate key-value pairs in the response string.
+
+    """
+
     def __init__(self, delimiter='|'):
         self.delimiter = delimiter
 
     def parse_response(self, response):
+        """
+        Parses a response string and returns a dictionary with vulnerability details.
+        {Vulnerability: <True or False>, Vulnerability Type: <CWE_number>, Vulnerability Name: <Name of CWE>}
+
+        Parameters:
+        - response (str): The response string to be parsed.
+
+        Returns:
+        - dict: A dictionary containing the parsed key-value pairs.
+
+        """
         if response is None:
             return {}
         
@@ -22,6 +44,17 @@ class ResponseParser:
         return parsed_data
 
     def responses_to_dataframe(self, responses, prompt_type):
+        """
+        Converts a dictionary of responses into a pandas DataFrame.
+
+        Parameters:
+        - responses (dict): A dictionary of responses, where the keys are test names and the values are dictionaries of model names and response strings.
+        - prompt_type (str): The type of prompt used to generate the responses.
+
+        Returns:
+        - pandas.DataFrame: A DataFrame containing the parsed responses.
+
+        """
         responses_list = []
         for test_name, results in responses.items():
             for model_name, response in results.items():
@@ -47,6 +80,14 @@ class ResponseParser:
         return df
     
     def save(self, df, filepath):
+        """
+        Saves a DataFrame to a CSV file.
+
+        Parameters:
+        - df (pandas.DataFrame): The DataFrame to be saved.
+        - filepath (str): The path to the output CSV file.
+
+        """
         df.to_csv(filepath)
     
 if __name__ == '__main__':

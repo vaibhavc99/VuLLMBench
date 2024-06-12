@@ -4,13 +4,30 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, 
     confusion_matrix, matthews_corrcoef, cohen_kappa_score
 )
+from ReportsGenerator.vuln_names_mapper import get_cwe_from_vuln_names
 
 class VulnerabilityEvaluator:
+    """
+    Evaluate the performance of LLMs in vulnerability prediction.
+    
+    Attributes:
+    - predicted_df (pd.DataFrame): DataFrame containing the predicted vulnerabilities.
+    - true_df (pd.DataFrame): DataFrame containing the actual vulnerabilities.
+    """
     def __init__(self, predicted_df: pd.DataFrame, true_df: pd.DataFrame):
         self.predicted_df = predicted_df
         self.true_df = true_df
 
     def extract_cwe(self, description):
+        """
+        Extracts the CWE number from a Predicted Vulnerability Type.
+
+        Parameters:
+        - description (str): Predicted Vulnerability Type.
+
+        Returns:
+        - int: The extracted CWE number or None if no CWE is found.
+        """
         match = re.search(r'(?i)cwe-?(\d+)|\b(\d+)\b', description)
         if match:
             cwe_number = match.group(1) if match.group(1) else match.group(2)
@@ -18,23 +35,46 @@ class VulnerabilityEvaluator:
         return None
 
     def evaluate_by_model(self):
+        """
+        Evaluates the performance of each model in the predicted_df DataFrame.
+
+        Returns:
+        - dict: A dictionary containing the evaluation results for each model.
+        """
         results = {}
         for model in self.predicted_df['Model'].unique():
-            model_df = self.predicted_df[self.predicted_df['Model'] == model].copy()
+            model_df:pd.DataFrame = self.predicted_df[self.predicted_df['Model'] == model].copy()
+
             model_df['cwe'] = model_df['Predicted Vulnerability Type'].apply(self.extract_cwe)
             merged_df = model_df.merge(self.true_df, left_index=True, right_index=True, suffixes=('_pred', '_true'))
             merged_df['cwe_pred'] = merged_df['cwe_pred'].fillna(-1)
+            merged_df['cwe_from_pred_name'] = get_cwe_from_vuln_names(merged_df['Predicted Vulnerability Name'])
             
+            merged_df.to_csv(f"df_eval_{model}.csv")
+
             vuln_metrics = self.evaluate_vulnerability(merged_df)
-            type_metrics = self.evaluate_vulnerability_type_multiclass(merged_df)
+            type_metrics_cwe = self.evaluate_vulnerability_type_multiclass(merged_df['cwe_true'], merged_df['cwe_pred'])
+            type_metrics_name = self.evaluate_vulnerability_type_multiclass(merged_df['cwe_true'], merged_df['cwe_from_pred_name'])
 
             results[model] = {
                 'Vulnerability Metrics': vuln_metrics,
-                'Vulnerability Type Metrics': type_metrics
+                'Vulnerability Type Metrics': {
+                    'Using Predicted CWE': type_metrics_cwe,
+                    'Using Predicted Vulnerability Name': type_metrics_name
+                }
             }
         return results
 
     def evaluate_vulnerability(self, df: pd.DataFrame):
+        """
+        Evaluates the binary classification performance for vulnerability detection.
+
+        Parameters:
+        - df (pd.DataFrame): DataFrame containing the predicted and true vulnerabilities.
+
+        Returns:
+        - dict: A dictionary containing various binary classification metrics.
+        """
         y_true = df['real_vulnerability'].astype(bool)
         y_pred = df['Predicted Vulnerability']
 
@@ -61,10 +101,17 @@ class VulnerabilityEvaluator:
         }
         return metrics
 
-    def evaluate_vulnerability_type_multiclass(self, df: pd.DataFrame):
-        cwe_true = df['cwe_true']
-        cwe_pred = df['cwe_pred']
-        
+    def evaluate_vulnerability_type_multiclass(self, cwe_true, cwe_pred):
+        """
+        Evaluates the multi-class classification performance for vulnerability types.
+
+        Parameters:
+        - cwe_true (pd.Series): Series containing the true CWE labels.
+        - cwe_pred (pd.Series): Series containing the predicted CWE labels.
+
+        Returns:
+        - dict: A dictionary containing various multi-class classification metrics.
+        """
         unique_labels = cwe_true.unique()
         precision_dict = {}
         recall_dict = {}

@@ -6,11 +6,27 @@ from LLMsInterface.ollama_utils import OllamaUtils
 import time
 
 class LLMs:
+    """
+    A class to manage and interact with various Large Language Models (LLMs) through hosts like OpenAI, Ollama, and Groq.
+
+    Attributes:
+    - config (object): Configuration object containing API keys, model lists, and other settings.
+    - ollama_checked (set): A set to keep track of checked Ollama models.
+    """
     def __init__(self, config):
         self.config = config
         self.ollama_checked = set()
         
     def get_model(self, model_name):
+        """
+        Retrieves the model object based on the model name.
+
+        Parameters:
+        - model_name (str): The name of the model to be retrieved.
+
+        Returns:
+        - model: The model object if found, otherwise None.
+        """
         if model_name in self.config.OPENAI_MODEL_LIST:
             model = ChatOpenAI(api_key=self.config.OPENAI_API_KEY, model=model_name, temperature=0)
 
@@ -31,6 +47,16 @@ class LLMs:
         return model 
     
     def get_response(self, prompt, model):
+        """
+        Retrieves the response from the model for a given prompt.
+
+        Parameters:
+        - prompt (str): The input prompt to be sent to the model.
+        - model: The model object to be invoked.
+
+        Returns:
+        - str: The response content from the model.
+        """
         while True:
             try:
                 response = model.invoke(prompt)
@@ -41,10 +67,18 @@ class LLMs:
                 print(f"Retrying after 5 seconds...")
                 time.sleep(5)
 
-    def _ask_llm(self, model, prompt):
-        return model.invoke(prompt)
     
     def ask_llms(self, prompt, model_names):
+        """
+        Invokes multiple models sequentially with the same prompt and retrieves their responses.
+
+        Parameters:
+        - prompt (str): The input prompt to be sent to the models.
+        - model_names (list): A list of model names to be invoked.
+
+        Returns:
+        - dict: A dictionary with model names as keys and their responses as values.
+        """
         responses = {}
 
         for model_name in model_names:
@@ -55,6 +89,16 @@ class LLMs:
         return responses
 
     def ask_llms_parallel(self, prompt, model_names):
+        """
+        Invokes multiple models in parallel with the same prompt and retrieves their responses.
+
+        Parameters:
+        - prompt (str): The input prompt to be sent to the models.
+        - model_names (list): A list of model names to be invoked.
+
+        Returns:
+        - dict: A dictionary with model names as keys and their responses as values.
+        """
         responses = {}
         models = [(model_name, self.get_model(model_name)) for model_name in model_names]
 

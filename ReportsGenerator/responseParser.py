@@ -66,16 +66,20 @@ class ResponseParser:
         df = pd.DataFrame(responses_list)
         df.set_index('Test Name', inplace=True)
 
-        df['Predicted Vulnerability'] = df['Vulnerability'].str.strip().str.lower().map({'true': True, 'false': False})
-        df['Predicted Vulnerability Type'] = df.get('Vulnerability Type', 'None')
-        df['Predicted Vulnerability Name'] = df.get('Vulnerability Name', 'None')
-        
-        if prompt_type == 'explanatory_insights':
-            df['Explanation'] = df.get('Explanation', 'None')
-        if prompt_type == 'solution_oriented':            
-            df['Solution'] = df.get('Solution', 'None')
+        df['predicted_vulnerability'] = df['Vulnerability'].str.strip().str.lower().map({'true': True, 'false': False})
+        df['predicted_vulnerability_name'] = df.get('Vulnerability Name', 'None')
 
-        df.drop(columns=['Vulnerability', 'Vulnerability Type','Vulnerability Name'], inplace=True)
+        if prompt_type == 'vulnerability_names':
+            df['predicted_cwe'] = 'None'
+        else:
+            df['predicted_cwe'] = df.get('Vulnerability Type', 'None')
+
+        if prompt_type == 'explanatory_insights':
+            df['explanation'] = df.get('Explanation', 'None')
+        if prompt_type == 'solution_oriented':            
+            df['solution'] = df.get('Solution', 'None')
+
+        df.drop(columns=['Vulnerability', 'Vulnerability Type','Vulnerability Name'], inplace=True, errors='ignore')
 
         return df
     

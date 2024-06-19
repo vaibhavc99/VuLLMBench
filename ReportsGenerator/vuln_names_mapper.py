@@ -4,7 +4,7 @@ import pandas as pd
 cwe_map = {
     22: "Path Traversal",
     78: "Command Injection",
-    79: "XSS (Cross-Site Scripting",
+    79: "Cross-Site Scripting",
     89: "SQL Injection",
     90: "LDAP Injection",
     327: "Weak Cryptography",
@@ -42,7 +42,7 @@ def normalize_string(s):
     - str: The normalized string.
     """
     s = s.lower()
-    s = re.sub(r'[\(\)\[\]\{\}\-_:,]', '', s)
+    s = re.sub(r'[^\w\s]', '', s)
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
@@ -87,7 +87,7 @@ def get_cwe_from_vuln_names(vuln_names):
     return matched_cwe_codes
 
 if __name__ == "__main__":
-    vuln_names = ["SQL Injection", "XSS (Cross-Site Scripting)", "Weak Crypto", "LDAP Injection", "pathtraver"]
+    vuln_names = ["SQL Injection", "('Cross-Site Scripting')", "Weak Crypto", "LDAP Injection", "pathtraver"]
     matched_cwe_codes = get_cwe_from_vuln_names(vuln_names)
 
     match_results = pd.DataFrame({

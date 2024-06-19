@@ -1,5 +1,0 @@
-Test Name,Model,Predicted Vulnerability,Predicted Vulnerability Type
-BenchmarkTest00001,llama3-8b-8192,True,CWE-22: Improper Limitation of a Path or Directory
-BenchmarkTest00001,mixtral-8x7b-32768,True,CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')).
-BenchmarkTest00002,llama3-8b-8192,True,CWE-22: Improper Limitation of a Path to a Predictable String within a Non-Canonical Path.
-BenchmarkTest00002,mixtral-8x7b-32768,True,CWE-22 (Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')).

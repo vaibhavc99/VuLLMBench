@@ -45,15 +45,18 @@ class VulnerabilityEvaluator:
         for model in self.predicted_df['Model'].unique():
             model_df:pd.DataFrame = self.predicted_df[self.predicted_df['Model'] == model].copy()
 
-            model_df['cwe'] = model_df['Predicted Vulnerability Type'].apply(self.extract_cwe)
+            model_df['cwe'] = model_df['predicted_cwe'].apply(self.extract_cwe)
             merged_df = model_df.merge(self.true_df, left_index=True, right_index=True, suffixes=('_pred', '_true'))
-            merged_df['cwe_pred'] = merged_df['cwe_pred'].fillna(-1)
-            merged_df['cwe_from_pred_name'] = get_cwe_from_vuln_names(merged_df['Predicted Vulnerability Name'])
+            merged_df['cwe_from_pred_name'] = get_cwe_from_vuln_names(merged_df['predicted_vulnerability_name'])
             
-            merged_df.to_csv(f"df_eval_{model}.csv")
+            vuln_metrics = self.evaluate_vulnerability_binary(merged_df)
 
-            vuln_metrics = self.evaluate_vulnerability(merged_df)
-            type_metrics_cwe = self.evaluate_vulnerability_type_multiclass(merged_df['cwe_true'], merged_df['cwe_pred'])
+            if merged_df['cwe_pred'].notnull().any():
+                merged_df['cwe_pred'] = merged_df['cwe_pred'].fillna(-1)
+                type_metrics_cwe = self.evaluate_vulnerability_type_multiclass(merged_df['cwe_true'], merged_df['cwe_pred'])
+            else:
+                type_metrics_cwe = 'Not Evaluated'
+
             type_metrics_name = self.evaluate_vulnerability_type_multiclass(merged_df['cwe_true'], merged_df['cwe_from_pred_name'])
 
             results[model] = {
@@ -63,9 +66,12 @@ class VulnerabilityEvaluator:
                     'Using Predicted Vulnerability Name': type_metrics_name
                 }
             }
+
+            self.save_dataframe(merged_df, model)
+
         return results
 
-    def evaluate_vulnerability(self, df: pd.DataFrame):
+    def evaluate_vulnerability_binary(self, df: pd.DataFrame):
         """
         Evaluates the binary classification performance for vulnerability detection.
 
@@ -76,7 +82,7 @@ class VulnerabilityEvaluator:
         - dict: A dictionary containing various binary classification metrics.
         """
         y_true = df['real_vulnerability'].astype(bool)
-        y_pred = df['Predicted Vulnerability']
+        y_pred = df['predicted_vulnerability']
 
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
         specificity= tn / (tn + fp)          # True Negative Rate
@@ -91,7 +97,7 @@ class VulnerabilityEvaluator:
             'Recall': recall_score(y_true, y_pred, zero_division=0),        # True Positive Rate | Sensitivity
             'F1-Score': f1_score(y_true, y_pred, zero_division=0),
             'ROC-AUC Score': roc_auc_score(y_true, y_pred),
-            # 'Confusion Matrix': confusion_matrix(y_true, y_pred).tolist(),
+            'Confusion Matrix': confusion_matrix(y_true, y_pred).tolist(),
             'FPR': false_positive_rate,
             'FNR': false_negative_rate,
             'Specificity': specificity,
@@ -112,13 +118,13 @@ class VulnerabilityEvaluator:
         Returns:
         - dict: A dictionary containing various multi-class classification metrics.
         """
-        unique_labels = cwe_true.unique()
+        cwe_labels = cwe_true.unique()
         precision_dict = {}
         recall_dict = {}
         accuracy_dict = {}
         f1_score_dict = {}
 
-        for label in unique_labels:
+        for label in cwe_labels:
             true_binary = (cwe_true == label)
             predicted_binary = (cwe_pred == label)
 
@@ -128,16 +134,16 @@ class VulnerabilityEvaluator:
             f1_score_dict[f"CWE-{label}"] = f1_score(true_binary, predicted_binary, zero_division=0)
 
 
-        overall_accuracy = accuracy_score(cwe_true, cwe_pred)
-        macro_precision = precision_score(cwe_true, cwe_pred, average='macro', zero_division=0)
-        macro_recall = recall_score(cwe_true, cwe_pred, average='macro', zero_division=0)
-        macro_f1 = f1_score(cwe_true, cwe_pred, average='macro', zero_division=0)
-        weighted_precision = precision_score(cwe_true, cwe_pred, average='weighted', zero_division=0)
-        weighted_recall = recall_score(cwe_true, cwe_pred, average='weighted', zero_division=0)
-        weighted_f1 = f1_score(cwe_true, cwe_pred, average='weighted', zero_division=0)
+        # overall_accuracy = accuracy_score(cwe_true, cwe_pred)
+        macro_precision = precision_score(cwe_true, cwe_pred, labels=cwe_labels, average='macro', zero_division=0)
+        macro_recall = recall_score(cwe_true, cwe_pred, labels=cwe_labels, average='macro', zero_division=0)
+        macro_f1 = f1_score(cwe_true, cwe_pred, labels=cwe_labels, average='macro', zero_division=0)
+        weighted_precision = precision_score(cwe_true, cwe_pred, labels=cwe_labels, average='weighted', zero_division=0)
+        weighted_recall = recall_score(cwe_true, cwe_pred, labels=cwe_labels, average='weighted', zero_division=0)
+        weighted_f1 = f1_score(cwe_true, cwe_pred, labels=cwe_labels, average='weighted', zero_division=0)
         mcc = matthews_corrcoef(cwe_true, cwe_pred)
-        kappa = cohen_kappa_score(cwe_true, cwe_pred)
-        # conf_matrix = confusion_matrix(cwe_true, cwe_pred).tolist()
+        kappa = cohen_kappa_score(cwe_true, cwe_pred, labels=cwe_labels)
+        conf_matrix = confusion_matrix(cwe_true, cwe_pred, labels=cwe_labels).tolist()
 
         return {
             'Per Class Metrics': {
@@ -146,7 +152,7 @@ class VulnerabilityEvaluator:
                 'Recall': recall_dict,
                 'F1-Score': f1_score_dict
             },
-            'Overall Accuracy': overall_accuracy,
+            # 'Overall Accuracy': overall_accuracy,
             'Macro Precision': macro_precision,
             'Macro Recall': macro_recall,
             'Macro F1-Score': macro_f1,
@@ -155,5 +161,16 @@ class VulnerabilityEvaluator:
             'Weighted F1-Score': weighted_f1,
             'MCC': mcc,
             'Cohen Kappa': kappa,
-            # 'Confusion Matrix': conf_matrix
+            'Confusion Matrix': conf_matrix
         }
+
+    def save_dataframe(self, df:pd.DataFrame, model:str):
+        """
+        Save the DataFrame to a CSV file.
+
+        Parameters:
+        - df (pd.DataFrame): The DataFrame to be saved.
+        """
+        columns = ['real_vulnerability', 'predicted_vulnerability', 'cwe_true', 'cwe_pred', 'cwe_from_pred_name']
+        df.index.name = 'test_name'
+        df.to_csv(f'Results/eval_df_{model}.csv', index=True, columns=columns)

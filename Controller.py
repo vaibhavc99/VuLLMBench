@@ -93,6 +93,8 @@ class Controller:
             for model_name in model_names:
                 if not self.db.response_exists(self.table_name, index, model_name) or not self.useCache:
                     models_to_query.append(model_name)
+                else:
+                    logging.info(f"Response for {index} by {model_name} already exists. Skipping LLM call.")
 
             if models_to_query:
                 responses = self.llm_interface.ask_llms(prompt, models_to_query)
@@ -101,8 +103,6 @@ class Controller:
                     self.db.insert_response(self.table_name, index, prompt, model_name, response)
                     logging.info(f"A response by {model_name} for {index} is stored in database.")
 
-            else:
-                logging.info(f"All responses for {index} already exist. Skipping LLM calls.")
 
     def generate_reports(self, prompt_type:str):
         """
@@ -122,18 +122,23 @@ class Controller:
         print(f"\nEvaluation Results: \n{results}")
 
         results_json = json.dumps(results, indent=4)
-        with open(f'evaluation_results-{prompt_type}_prompt.json', 'w') as file:
+        with open(f'Results/evaluation_results-{prompt_type}_prompt.json', 'w') as file:
             file.write(results_json)
 
 
 if __name__ == '__main__':
-    # prompt_types = ["simple", "vulnerability_specific", "explanatory_insights", "solution_oriented"]
+    # prompt_types = ["simple", "vulnerability_specific", "vulnerability_names", "explanatory_insights", "solution_oriented"]
     prompt_type = "simple"
     table_name = f"{prompt_type}_prompt_default"
     model_names = [config.GROQ_MODEL_LIST[0]]
-    
+    stratification_options = {
+        "stratify": True,
+        "stratify_cols": ["category", "cwe"],
+        "test_size": 0.01,
+        "random_state": 12
+    }
     controller = Controller(config.DATA_DIR_PATH, table_name)
-    controller.load_examples()
+    controller.load_examples(stratification_options=stratification_options)
     controller.send_to_llm(model_names,prompt_type)
     controller.generate_reports(prompt_type)
     controller.db.close()

@@ -6,3 +6,5 @@ langchain-openai
 langchain-groq
 scikit-learn
 javalang
+plotly
+dash

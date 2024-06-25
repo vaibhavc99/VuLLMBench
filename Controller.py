@@ -16,7 +16,7 @@ class Controller:
 
     Parameters:
     - data_dir_path (str): The path to the directory containing the OWASP examples.
-    - table_name (str): The name of the table to store the LLM responses in the database.
+    - table_name (str, optional): The name of the table to store the LLM responses in the database.
     - useCache (bool, optional): Flag indicating whether to use cached LLM responses. Defaults to True.
 
     Attributes:
@@ -31,7 +31,7 @@ class Controller:
 
     """
 
-    def __init__(self, data_dir_path:str, table_name:str, useCache:bool=True):
+    def __init__(self, data_dir_path:str, table_name:str=None, useCache:bool=True):
         self.preprocessor = OwaspProcessor(data_dir_path)
         self.prompt_generator = PromptGenerator()
         self.llm_interface = LLMs(config)
@@ -75,7 +75,8 @@ class Controller:
     
     def send_to_llm(self, model_names:list, prompt_type:str):
         """
-        Send the examples to the LLMs and store the responses in the database.
+        Determines which examples need querying based on cache and existing responses, prepares prompts, 
+        queries the LLMs, and stores the responses in the database.
 
         Parameters:
         - model_names (list): The names of the LLM models to query.
@@ -85,44 +86,57 @@ class Controller:
         if self.examples is None:
             logging.error("Examples not loaded.")
             return
+
+        missing_indices = {}
+        for model_name in model_names:
+            missing_indices[model_name] = [
+                index for index, row in self.examples.iterrows()
+                if not self.db.response_exists(self.table_name, index, model_name) or not self.useCache
+            ]
+
+        if not any(missing_indices.values()):
+            logging.info(f"Responses for the '{prompt_type} prompt' by models {model_names} already exist in the database. Skipping LLM calls.")
+            return
         
-        for index, row in self.examples.iterrows():
-            prompt = self.get_prompt(row["code_snippet"], prompt_type)
-            models_to_query = []
+        prompts_per_model = {}
+        prompt_lookup = {}
 
-            for model_name in model_names:
-                if not self.db.response_exists(self.table_name, index, model_name) or not self.useCache:
-                    models_to_query.append(model_name)
-                else:
-                    logging.info(f"Response for {index} by {model_name} already exists. Skipping LLM call.")
+        for model_name, indices in missing_indices.items():
+            prompts_per_model[model_name] = []
+            for index in indices:
+                prompt = self.get_prompt(self.examples.loc[index, "code_snippet"], prompt_type)
+                prompts_per_model[model_name].append((index, prompt))
+                prompt_lookup[(index, model_name)] = prompt
 
-            if models_to_query:
-                responses = self.llm_interface.ask_llms(prompt, models_to_query)
+        responses = self.llm_interface.query_llms(prompts_per_model)
 
-                for model_name, response in responses.items():
-                    self.db.insert_response(self.table_name, index, prompt, model_name, response)
-                    logging.info(f"A response by {model_name} for {index} is stored in database.")
+        for (index, model_name), response in responses.items():
+            prompt = prompt_lookup[(index, model_name)]
+            self.db.insert_response(self.table_name, index, prompt, model_name, response)
+
+            logging.info(f"A response by {model_name} for {index} is stored in database.")
 
 
-    def generate_reports(self, prompt_type:str):
+    def generate_reports(self, prompt_type:str, experiment:str=None):
         """
         Generate reports based on the LLM responses.
 
         Parameters:
         - prompt_type (str): The type of prompt used for querying the models.
+        - experiment (str, optional): The name of the experiment.
 
         """
-        logging.info("Generating reports based on LLM responses.")
+        logging.info(f"Generating reports for Experiment-{experiment} based on LLM responses.")
 
         responses = self.db.get_all_responses(self.table_name)
         df = self.response_parser.responses_to_dataframe(responses, prompt_type)
 
         evaluator = VulnerabilityEvaluator(df, self.examples)
-        results = evaluator.evaluate_by_model()
+        results = evaluator.evaluate_by_model(experiment, prompt_type)
         print(f"\nEvaluation Results: \n{results}")
 
         results_json = json.dumps(results, indent=4)
-        with open(f'Results/evaluation_results-{prompt_type}_prompt.json', 'w') as file:
+        with open(f'./Evaluation/{experiment}/eval_results_{prompt_type}-prompt.json', 'w') as file:
             file.write(results_json)
 
 
@@ -130,7 +144,7 @@ if __name__ == '__main__':
     # prompt_types = ["simple", "vulnerability_specific", "vulnerability_names", "explanatory_insights", "solution_oriented"]
     prompt_type = "simple"
     table_name = f"{prompt_type}_prompt_default"
-    model_names = [config.GROQ_MODEL_LIST[0]]
+    model_names = [config.HOC_MODEL_LIST[0]]
     stratification_options = {
         "stratify": True,
         "stratify_cols": ["category", "cwe"],

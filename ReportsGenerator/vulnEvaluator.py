@@ -34,9 +34,13 @@ class VulnerabilityEvaluator:
             return int(cwe_number)
         return None
 
-    def evaluate_by_model(self):
+    def evaluate_by_model(self, experiment_name:str, prompt_type:str):
         """
         Evaluates the performance of each model in the predicted_df DataFrame.
+
+        Parameters:
+        - experiment_name (str): The name of the experiment.
+        - prompt_type (str): The type of prompt used for the LLM queries.
 
         Returns:
         - dict: A dictionary containing the evaluation results for each model.
@@ -67,7 +71,7 @@ class VulnerabilityEvaluator:
                 }
             }
 
-            self.save_dataframe(merged_df, model)
+            self.save_dataframe(merged_df, model, experiment_name, prompt_type)
 
         return results
 
@@ -105,6 +109,7 @@ class VulnerabilityEvaluator:
             'FDR': false_discovery_rate,
             'MCC': matthews_corrcoef(y_true, y_pred),
         }
+
         return metrics
 
     def evaluate_vulnerability_type_multiclass(self, cwe_true, cwe_pred):
@@ -164,13 +169,17 @@ class VulnerabilityEvaluator:
             'Confusion Matrix': conf_matrix
         }
 
-    def save_dataframe(self, df:pd.DataFrame, model:str):
+    def save_dataframe(self, df:pd.DataFrame, model:str, experiment_name:str, prompt_type:str):
         """
         Save the DataFrame to a CSV file.
 
         Parameters:
         - df (pd.DataFrame): The DataFrame to be saved.
+        - model (str): The name of the model.
+        - experiment_name (str): The name of the experiment.
+        - prompt_type (str): The type of prompt used for the LLM queries.
         """
         columns = ['real_vulnerability', 'predicted_vulnerability', 'cwe_true', 'cwe_pred', 'cwe_from_pred_name']
         df.index.name = 'test_name'
-        df.to_csv(f'Results/eval_df_{model}.csv', index=True, columns=columns)
+        model = model.replace('/', '-')
+        df.to_csv(f'Evaluation/{experiment_name}/eval_df_{prompt_type}-prompt_{model}.csv', index=True, columns=columns)

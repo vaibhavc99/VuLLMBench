@@ -31,4 +31,8 @@ GROQ_MODEL_LIST = [
     "llama3-70b-8192"
 ]
 
+HOC_MODEL_LIST = [
+    "psyche/Meta-Llama-3-70B-Instruct-awq"
+]
+
 MODEL_PARAMETERS = {"temperature": 0.1}

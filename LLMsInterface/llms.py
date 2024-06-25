@@ -4,6 +4,7 @@ from langchain_groq import ChatGroq
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from LLMsInterface.ollama_utils import OllamaUtils
 import time
+import logging
 
 class LLMs:
     """
@@ -41,6 +42,14 @@ class LLMs:
         elif model_name in self.config.GROQ_MODEL_LIST:
             model = ChatGroq(groq_api_key=self.config.GROQ_API_KEY, model=model_name, temperature=0)
 
+        elif model_name in self.config.HOC_MODEL_LIST:
+            model = ChatOpenAI(
+                openai_api_key="EMPTY", 
+                openai_api_base="http://hoc-lx-gpu02.ad.iem-hoc.de:8080/v1",
+                model=model_name,
+                temperature=0
+            )
+
         else:
             return None
 
@@ -68,27 +77,39 @@ class LLMs:
                 time.sleep(5)
 
     
-    def ask_llms(self, prompt, model_names):
+    def query_llms(self, prompts_per_model: dict):
         """
-        Invokes multiple models sequentially with the same prompt and retrieves their responses.
+        Queries multiple models with concurrent prompts and retrieves their responses.
 
         Parameters:
-        - prompt (str): The input prompt to be sent to the models.
-        - model_names (list): A list of model names to be invoked.
+        - prompts_per_model (dict): A dictionary where keys are model names and values are lists of tuples,
+        each containing an index and a prompt to be sent to the respective model. 
 
         Returns:
-        - dict: A dictionary with model names as keys and their responses as values.
+        - dict: A dictionary with keys as tuples of (index, model name) and their responses as values.
         """
         responses = {}
 
-        for model_name in model_names:
-            model = self.get_model(model_name)
-            response = self.get_response(prompt, model)           
-            responses[model_name] = response
+        try:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {}
+                for model_name, prompts in prompts_per_model.items():
+                    model = self.get_model(model_name)
+                    for index, prompt in prompts:
+                        futures[(index, model_name)] = executor.submit(self.get_response, prompt, model)
 
-        return responses
+                for key, future in futures.items():
+                    try:
+                        responses[key] = future.result()
+                    except Exception as e:
+                        logging.error(f"Failed to get response for {key}: {e}")
 
-    def ask_llms_parallel(self, prompt, model_names):
+        except (KeyboardInterrupt, SystemExit):
+            logging.warning("Program interrupted. Returning collected responses so far.")
+        finally:
+            return responses
+
+    def query_llms_parallel(self, prompt, model_names):
         """
         Invokes multiple models in parallel with the same prompt and retrieves their responses.
 

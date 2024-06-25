@@ -5,6 +5,10 @@ import configparser
 from Controller import Controller
 
 def main():
+    """
+    The main function to execute the vulnerability detection benchmark.
+    Parses arguments, loads paths and configurations, and runs the controller.
+    """
     args = parse_arguments()
     paths = load_paths(args)
     try:
@@ -22,10 +26,17 @@ def main():
         logging.error(f'An error occurred: {e}')
 
 def run_controller(args, paths, config=None):
+    """
+    Runs the Controller with the provided arguments and configurations.
+    
+    Parameters:
+    - args: Parsed arguments
+    - paths: Dictionary containing paths
+    - config: Configuration object if provided, else None
+    """
     if config:
         use_cache = config.getboolean('General', 'use_cache')
-        prompt_type = config['General']['prompt_type']
-        table_name = f"{prompt_type}_prompt_{args.experiment}"
+        prompt_types = [ptype.strip() for ptype in config['General']['prompt_type'].split(',')]
         model_names = [name.strip() for name in config['LLM']['model_names'].split(',')]
         processing_options = {key: config['Preprocessing Options'].getboolean(key)
                               for key in config['Preprocessing Options']}
@@ -42,22 +53,34 @@ def run_controller(args, paths, config=None):
 
     else:
         use_cache = not args.no_cache
-        prompt_type = args.prompt_type
-        table_name = f"{prompt_type}_prompt_default"
+        prompt_types = args.prompt_types
         model_names = args.model_names
         processing_options = {option: False for option in PROCESSING_OPTIONS}
         for option in args.processing_options:
             processing_options[option] = True
         stratification_options = None
 
-
-    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, table_name=table_name)
+    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache)
     controller.load_examples(processing_options, stratification_options)
-    controller.send_to_llm(model_names, prompt_type)
-    controller.generate_reports(prompt_type)
+
+    for prompt_type in prompt_types:
+        table_name = f"{args.experiment if args.experiment else 'default'}_{prompt_type}_prompt"
+        controller.table_name = table_name
+        controller.send_to_llm(model_names, prompt_type)
+        controller.generate_reports(prompt_type, args.experiment if args.experiment else 'default')
+    
     controller.db.close()
 
 def load_paths(args):
+    """
+    Loads and validates the paths based on the provided arguments.
+    
+    Parameters:
+    - args: Parsed arguments
+    
+    Returns:
+    - Dictionary containing resolved paths
+    """
     paths = {}
     
     data_path = Path(args.data).resolve()
@@ -79,15 +102,30 @@ def load_paths(args):
     return paths
 
 def load_config(config_path):
+    """
+    Loads the configuration file.
+    
+    Parameters:
+    - config_path: Path to the configuration file
+    
+    Returns:
+    - Configuration object
+    """
     config = configparser.ConfigParser()
     config.read(config_path)
     return config
 
 def parse_arguments():
+    """
+    Parses command-line arguments.
+    
+    Returns:
+    - Parsed arguments
+    """
     parser = argparse.ArgumentParser(description='Vulnerability Detection Benchmark')
     parser.add_argument('-d', '--data', help='Path to the directory containing the data (Code Examples)', default='./CodeExamples')
     parser.add_argument('-m', '--model_names', nargs='+', help='Names of the models to use', default=['llama3-8b-8192'])
-    parser.add_argument('-p', '--prompt_type', choices=['simple', 'vulnerability_specific', 'explanatory_insights', 'solution_oriented'], help='Type of prompt to use for LLM queries', default='simple')
+    parser.add_argument('--prompt_types', nargs='+', choices=['simple', 'vulnerability_specific', 'vulnerability_names', 'explanatory_insights', 'solution_oriented'], help='Types of prompts to use for LLM queries', default=['simple'])
     parser.add_argument('--no_cache', action='store_true', help='Do not use cache')
     parser.add_argument('-e', '--experiment', help='Name of the experiment to execute. The name must correspond to one directory in the Evaluation directory which contains a configuration file')
     parser.add_argument('--processing_options', nargs='*', choices=PROCESSING_OPTIONS, help='Processing options to apply for the examples', default=['remove_multiline_comments'])
@@ -95,6 +133,12 @@ def parse_arguments():
     return parser.parse_args()
 
 def configure_logging(config=None):
+    """
+    Configures logging based on the provided configuration.
+    
+    Parameters:
+    - config: Configuration object if provided, else None
+    """
     if config:
         logging_options = {
             'debug': logging.DEBUG,

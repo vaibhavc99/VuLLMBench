@@ -1,4 +1,6 @@
 import sqlite3
+import json
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 class LLMResponseDB:
     """
@@ -68,14 +70,16 @@ class LLMResponseDB:
         Parameters:
         - table (str): The name of the table.
         - test_name (str): The name of the test.
-        - prompt (str): The prompt for the response.
+        - prompt (list): The list of messages for the response.
         - model_name (str): The name of the model.
         - response (str): The response.
-
         """
         self.ensure_table_exists(table)
         model_column = f'"{model_name}"'
-        prompt_str = f"SYSTEM_PROMPT: {prompt[0].content}\nUSER_PROMPT: {prompt[1].content}"
+
+        # Extract the message type and content from each message and convert to a JSON string
+        prompt_contents = [{"type": type(message).__name__, "content": message.content} for message in prompt]
+        prompt_json = json.dumps(prompt_contents)
 
         self.ensure_column_exists(table, "prompt")
         self.ensure_column_exists(table, model_column)
@@ -84,10 +88,10 @@ class LLMResponseDB:
 
         row = self.cursor.fetchone()
         if row is None:
-            self.cursor.execute(f"INSERT INTO {table} (test_name, prompt, {model_column}) VALUES (?, ?, ?)", (test_name, prompt_str, response))
+            self.cursor.execute(f"INSERT INTO {table} (test_name, prompt, {model_column}) VALUES (?, ?, ?)", (test_name, prompt_json, response))
         else:
             if row[0] is None:
-                self.cursor.execute(f"UPDATE {table} SET prompt = ? WHERE test_name = ?", (prompt_str, test_name))
+                self.cursor.execute(f"UPDATE {table} SET prompt = ? WHERE test_name = ?", (prompt_json, test_name))
             self.cursor.execute(f"UPDATE {table} SET {model_column} = ? WHERE test_name = ?", (response, test_name))
 
         self.db.commit()
@@ -131,24 +135,38 @@ class LLMResponseDB:
         rows = self.cursor.fetchall()
         return {row[0]: dict(zip(column_names, row[2:])) for row in rows}
     
-    def get_responses_by_model(self, table, model_name):
+    def get_response_by_index_and_model(self, table, index, model_name):
         """
-        Retrieves responses from the specified table for the given model name.
+        Retrieves the prompt and response for a specific index and model from the specified table.
 
         Parameters:
         - table (str): The name of the table.
+        - index (int): The index of the example.
         - model_name (str): The name of the model.
 
         Returns:
-        - dict: A dictionary containing the responses, where the keys are the test names and the values are the responses.
+        - dict: A dictionary containing the prompt and response, or None if not found.
         """
         model_column = f'"{model_name}"'
         if self.column_exists(table, model_column):
-            self.cursor.execute(f"SELECT test_name, {model_column} FROM {table}")
-            rows = self.cursor.fetchall()
-            return {row[0]: row[1] for row in rows if row[1] is not None}
-        else:
-            return {}
+            self.cursor.execute(f"SELECT prompt, {model_column} FROM {table} WHERE test_name = ?", (index,))
+            row = self.cursor.fetchone()
+            if row:
+                prompt_json, response = row
+                prompt_contents = json.loads(prompt_json)
+                prompt = []
+                for item in prompt_contents:
+                    if item['type'] == 'SystemMessage':
+                        prompt.append(SystemMessage(content=item['content']))
+                    elif item['type'] == 'HumanMessage':
+                        prompt.append(HumanMessage(content=item['content']))
+                    elif item['type'] == 'AIMessage':
+                        prompt.append(AIMessage(content=item['content']))
+                return {
+                    'prompt': prompt,
+                    'response': response
+                }
+        return None    
 
     def close(self):
         """
@@ -158,10 +176,10 @@ class LLMResponseDB:
 
 if __name__ == '__main__':
     db_path = '../llms_responses.db'
-    table_name = 'simple'
+    table_name = 'exp07_test_prompt_self_reflection'
     db = LLMResponseDB(db_path)
     # print(db.response_exists("simple", "BenchmarkTest00001","llama3-70b-8192"))
     # db.ensure_table_exists(table_name)
-    all_responses = db.get_all_responses(table_name)
+    all_responses = db.get_response_by_index_and_model(table_name, "BenchmarkTest01517","llama3-8b-8192")
     db.close()
     print(all_responses)

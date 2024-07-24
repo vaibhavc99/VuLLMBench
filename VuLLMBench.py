@@ -38,6 +38,7 @@ def run_controller(args, paths, config=None):
         use_cache = config.getboolean('General', 'use_cache')
         prompt_types = [ptype.strip() for ptype in config['General']['prompt_type'].split(',')]
         self_reflection = config.getboolean('General', 'self_reflection', fallback=False)
+        self_reflection_gt = config.getboolean('General', 'self_reflection_gt', fallback=False)
         model_names = [name.strip() for name in config['LLM']['model_names'].split(',')]
         processing_options = {key: config['Preprocessing Options'].getboolean(key)
                               for key in config['Preprocessing Options']}
@@ -56,13 +57,14 @@ def run_controller(args, paths, config=None):
         use_cache = not args.no_cache
         prompt_types = args.prompt_types
         self_reflection = args.self_reflection
+        self_reflection_gt = args.self_reflection_gt
         model_names = args.model_names
         processing_options = {option: False for option in PROCESSING_OPTIONS}
         for option in args.processing_options:
             processing_options[option] = True
         stratification_options = None
 
-    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, self_reflection=self_reflection)
+    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
     controller.load_examples(processing_options, stratification_options)
 
     for prompt_type in prompt_types:
@@ -132,6 +134,7 @@ def parse_arguments():
     parser.add_argument('-e', '--experiment', help='Name of the experiment to execute. The name must correspond to one directory in the Evaluation directory which contains a configuration file')
     parser.add_argument('--processing_options', nargs='*', choices=PROCESSING_OPTIONS, help='Processing options to apply for the examples', default=['remove_multiline_comments'])
     parser.add_argument('--self_reflection', action='store_true', help='Enable to perform self-reflection on LLM responses.')
+    parser.add_argument('--self_reflection_gt', action='store_true', help='Enable to perform self-reflection on LLM responses with ground truth.')
     
     return parser.parse_args()
 

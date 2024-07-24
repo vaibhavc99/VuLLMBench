@@ -19,6 +19,7 @@ class Controller:
     - table_name (str, optional): The name of the table to store the LLM responses in the database.
     - useCache (bool, optional): Flag indicating whether to use cached LLM responses. Defaults to True.
     - self_reflection (bool, optional): Flag indicating whether to perform self-reflection prompts. Defaults to False.
+    - self_reflection_gt (bool, optional): Flag indicating whether to perform self-reflection prompts with ground truth. Defaults to False.
 
     Attributes:
     - preprocessor (OwaspProcessor): An instance of the OwaspProcessor class for preprocessing OWASP examples.
@@ -30,10 +31,11 @@ class Controller:
     - table_name (str): The name of the table to store the LLM responses in the database.
     - useCache (bool): Flag indicating whether to use cached LLM responses.
     - self_reflection (bool): Flag indicating whether to perform self-reflection on LLM responses.
+    - self_reflection_gt (bool): Flag indicating whether to perform self-reflection on LLM responses with ground truth.
 
     """
 
-    def __init__(self, data_dir_path: str, table_name: str = None, useCache: bool = True, self_reflection: bool = False):
+    def __init__(self, data_dir_path: str, table_name: str = None, useCache: bool = True, self_reflection: bool = False, self_reflection_gt: bool = False):
         self.preprocessor = OwaspProcessor(data_dir_path)
         self.prompt_generator = PromptGenerator()
         self.llm_interface = LLMs(config)
@@ -43,6 +45,7 @@ class Controller:
         self.table_name = table_name
         self.useCache = useCache
         self.self_reflection = self_reflection
+        self.self_reflection_gt = self_reflection_gt
         logging.basicConfig(level=logging.INFO)
 
     def load_examples(self, processing_options=None, stratification_options=None):
@@ -94,6 +97,8 @@ class Controller:
 
         if self.self_reflection:
             self.prepare_and_query_llms(model_names, f"{prompt_type}_self_reflection", reflection=True)
+        if self.self_reflection_gt:
+            self.prepare_and_query_llms(model_names, f"{prompt_type}_self_reflection_with_ground_truth", reflection=True)
 
     def prepare_and_query_llms(self, model_names: list, prompt_type: str, reflection: bool = False):
         """
@@ -106,7 +111,15 @@ class Controller:
 
         """
         missing_indices = {}
-        table_name = f"{self.table_name}_self_reflection" if reflection else self.table_name
+
+        # Determine the correct table name
+        if reflection:
+            if "ground_truth" in prompt_type:
+                table_name = f"{self.table_name}_self_reflection_with_ground_truth"
+            else:
+                table_name = f"{self.table_name}_self_reflection"
+        else:
+            table_name = self.table_name
 
         for model_name in model_names:
             missing_indices[model_name] = [
@@ -133,7 +146,11 @@ class Controller:
                             original_prompt[1],                 # Original user message
                             ("ai", original_response)           # Original response
                         ]
-                        prompt = self.prompt_generator.generate_self_reflection_prompt(chat_history)
+                        if "ground_truth" in prompt_type:
+                            ground_truth = self.examples.loc[index, "real_vulnerability"]
+                            prompt = self.prompt_generator.generate_self_reflection_with_ground_truth_prompt(chat_history, ground_truth)
+                        else:
+                            prompt = self.prompt_generator.generate_self_reflection_prompt(chat_history)
                 else:
                     prompt = self.get_prompt(self.examples.loc[index, "code_snippet"], prompt_type)
                 
@@ -150,7 +167,6 @@ class Controller:
                 logging.info(f"A self-reflection response by {model_name} for {index} is stored in database.")
             else:
                 logging.info(f"A response by {model_name} for {index} is stored in database.")
-
 
     def generate_reports(self, prompt_type: str, experiment: str = None):
         """
@@ -169,6 +185,8 @@ class Controller:
         # Self-reflection evaluation
         if self.self_reflection:
             self.evaluate_and_save_results(f"{prompt_type}_self_reflection", experiment)
+        if self.self_reflection_gt:
+            self.evaluate_and_save_results(f"{prompt_type}_self_reflection_with_ground_truth", experiment)
 
     def evaluate_and_save_results(self, prompt_type: str, experiment: str):
         """
@@ -178,7 +196,14 @@ class Controller:
         - prompt_type (str): The type of prompt used for querying the models.
         - experiment (str): The name of the experiment.
         """
-        table_name = f"{self.table_name}_self_reflection" if "self_reflection" in prompt_type else self.table_name
+        # Determine the correct table name
+        if "self_reflection_with_ground_truth" in prompt_type:
+            table_name = f"{self.table_name}_self_reflection_with_ground_truth"
+        elif "self_reflection" in prompt_type:
+            table_name = f"{self.table_name}_self_reflection"
+        else:
+            table_name = self.table_name
+
         responses = self.db.get_all_responses(table_name)
         df = self.response_parser.responses_to_dataframe(responses, prompt_type)
 
@@ -192,20 +217,22 @@ class Controller:
 
 
 if __name__ == '__main__':
-    # prompt_types = ["simple", "vulnerability_specific", "vulnerability_names", "explanatory_insights", "solution_oriented"]
     prompt_type = "simple"
-    table_name = f"{prompt_type}_prompt_default"
-    model_names = [config.HOC_MODEL_LIST[0]]
+    table_name = f"{prompt_type}_prompt_test"
+    model_names = [config.GROQ_MODEL_LIST[0]]
     stratification_options = {
         "stratify": True,
         "stratify_cols": ["category", "cwe"],
         "test_size": 0.01,
         "random_state": 12
     }
-    controller = Controller(config.DATA_DIR_PATH, table_name, self_reflection=True)
+    self_reflection = False
+    self_reflection_gt = True
+    controller = Controller(config.DATA_DIR_PATH, table_name, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
     controller.load_examples(stratification_options=stratification_options)
-    controller.send_to_llm(model_names,prompt_type)
-    controller.generate_reports(prompt_type)
+    controller.send_to_llm(model_names, prompt_type)
+    
+    controller.generate_reports(prompt_type, experiment="default")
     controller.db.close()
-   
+
     logging.info("Done.")

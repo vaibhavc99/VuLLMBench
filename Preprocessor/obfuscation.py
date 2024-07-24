@@ -36,6 +36,13 @@ def obfuscate(source_code, classes=True, methods=True, variables=True, parameter
     modifications = {}
     new_class_name = None
 
+    # Collect all types to avoid renaming parts of fully qualified names
+    all_types = set()
+    for path, node in tree:
+        if isinstance(node, javalang.tree.ReferenceType):
+            type_name = node.name
+            all_types.update(type_name.split('.'))
+
     for path, node in tree:
         if isinstance(node, javalang.tree.ClassDeclaration) and classes:
             testcase_name = re.search(r'BenchmarkTest(\d{5})', node.name)
@@ -49,23 +56,34 @@ def obfuscate(source_code, classes=True, methods=True, variables=True, parameter
         elif isinstance(node, javalang.tree.MethodDeclaration) and methods:
             modifications[node.name] = _rename(node.name, 'method')
             
-        elif isinstance(node, javalang.tree.VariableDeclarator) and variables:
+        elif isinstance(node, javalang.tree.VariableDeclarator) and variables and node.name != 'serialVersionUID' and node.name != 'length':
             modifications[node.name] = _rename(node.name, 'var')
 
         elif isinstance(node, javalang.tree.FormalParameter) and parameters:
             modifications[node.name] = _rename(node.name, 'param')
-    
+
+    # Avoid replacing "value" in @WebServlet annotations
+    webservlet_patterns = re.findall(r'@WebServlet\s*\(.*?value\s*=\s*\".*?\"\)', modified_code)
+    for pattern in webservlet_patterns:
+        modified_code = modified_code.replace(pattern, pattern.replace('value', 'value_PLACEHOLDER'))
+
     for token in tokens:
         if token.value in modifications:
-            modified_code = re.sub(r'\b' + re.escape(token.value) + r'\b', modifications[token.value], modified_code)
+            # Ensure we are not replacing parts of fully qualified names
+            if token.value not in all_types:
+                if isinstance(token, javalang.tokenizer.Identifier):
+                    modified_code = re.sub(r'\b' + re.escape(token.value) + r'\b', modifications[token.value], modified_code)
+
+    # Restore "value" in @WebServlet annotations
+    modified_code = modified_code.replace('value_PLACEHOLDER', 'value')
     
     return modified_code, new_class_name
 
 if __name__ == '__main__':
-    with open('./BenchmarkTest01533.java', 'r') as file:
+    with open('./BenchmarkTest00292.java', 'r') as file:
         java_code = file.read()
 
-    modified_code, new_class_name = obfuscate(java_code, classes=True, methods=True, variables=True, parameters=True)
+    modified_code, new_class_name = obfuscate(java_code, classes=True, methods=False, variables=True, parameters=True)
 
     with open(f'./{new_class_name}.java', 'w') as file:
         file.write(modified_code)

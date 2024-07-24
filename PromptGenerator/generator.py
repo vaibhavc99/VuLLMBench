@@ -17,12 +17,13 @@ class PromptGenerator:
             "explanatory_insights": (prompt_templates.EXPL_SYSTEM_PROMPT, prompt_templates.EXPL_USER_PROMPT),
             "solution_oriented": (prompt_templates.SOL_SYSTEM_PROMPT, prompt_templates.SIMPLE_USER_PROMPT),
             "test": (prompt_templates.TEST_SYSTEM_PROMPT, prompt_templates.TEST_USER_PROMPT),
-            "self_reflection": prompt_templates.SELF_REFLECTION_PROMPT
+            "self_reflection": prompt_templates.SELF_REFLECTION_PROMPT,
+            "self_reflection_with_ground_truth": prompt_templates.SELF_REFLECTION_WITH_GROUND_TRUTH_PROMPT
         }
 
     def generate_prompt(self, code_snippet, prompt_type):
         """
-        Generates a prompt for the given code snippet and prompt type.
+        Generates a prompt based on the given code snippet and prompt type.
 
         Parameters:
         - code_snippet (str): The code snippet to be included in the prompt.
@@ -72,6 +73,30 @@ class PromptGenerator:
 
         return final_prompt   
     
+    def generate_self_reflection_with_ground_truth_prompt(self, chat_history, ground_truth):
+        """
+        Generates a self-reflection prompt based on the chat history and ground truth.
+
+        Parameters:
+        - chat_history (list): A list of chat messages to be included in the self-reflection prompt.
+        - ground_truth (str): The ground truth information to be included in the prompt.
+
+        Returns:
+        - str: The formatted self-reflection with ground truth prompt.
+        """
+        self_reflection_with_ground_truth_template = self.prompt_types.get("self_reflection_with_ground_truth", None)
+
+        chat_template = ChatPromptTemplate.from_messages(
+            [
+                MessagesPlaceholder("chat_history"),
+                ("human", self_reflection_with_ground_truth_template)
+            ]
+        )
+
+        final_prompt = chat_template.format_messages(chat_history=chat_history, ground_truth=ground_truth)
+
+        return final_prompt
+
 if __name__ == "__main__":
     gen = PromptGenerator()
     messages = gen.generate_prompt("def foo(): pass", "simple")

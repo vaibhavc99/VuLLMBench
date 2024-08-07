@@ -1,5 +1,4 @@
 import pandas as pd
-import re
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, 
     confusion_matrix, matthews_corrcoef, cohen_kappa_score
@@ -18,29 +17,9 @@ class VulnerabilityEvaluator:
         self.predicted_df = predicted_df
         self.true_df = true_df
 
-    def extract_cwe(self, description):
-        """
-        Extracts the CWE number from a Predicted Vulnerability Type.
-
-        Parameters:
-        - description (str): Predicted Vulnerability Type.
-
-        Returns:
-        - int: The extracted CWE number or None if no CWE is found.
-        """
-        match = re.search(r'(?i)cwe-?(\d+)|\b(\d+)\b', description)
-        if match:
-            cwe_number = match.group(1) if match.group(1) else match.group(2)
-            return int(cwe_number)
-        return None
-
     def evaluate_by_model(self, experiment_name:str, prompt_type:str):
         """
         Evaluates the performance of each model in the predicted_df DataFrame.
-
-        Parameters:
-        - experiment_name (str): The name of the experiment.
-        - prompt_type (str): The type of prompt used for the LLM queries.
 
         Returns:
         - dict: A dictionary containing the evaluation results for each model.
@@ -49,7 +28,7 @@ class VulnerabilityEvaluator:
         for model in self.predicted_df['Model'].unique():
             model_df:pd.DataFrame = self.predicted_df[self.predicted_df['Model'] == model].copy()
 
-            model_df['cwe'] = model_df['predicted_cwe'].apply(self.extract_cwe)
+            model_df['cwe'] = model_df['predicted_cwe']
             merged_df = model_df.merge(self.true_df, left_index=True, right_index=True, suffixes=('_pred', '_true'))
             merged_df['cwe_from_pred_name'] = get_cwe_from_vuln_names(merged_df['predicted_vulnerability_name'])
             

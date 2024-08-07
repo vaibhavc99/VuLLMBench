@@ -70,13 +70,11 @@ class LLMs:
             try:
                 response = model.invoke(prompt)
                 return response.content
-                # break
             except Exception as e:
-                print(f"Error invoking model: {str(e)}")
-                print(f"Retrying after 5 seconds...")
+                logging.error(f"Error invoking model: {str(e)}")
+                logging.info(f"Retrying after 5 seconds...")
                 time.sleep(5)
 
-    
     def query_llms(self, prompts_per_model: dict):
         """
         Queries multiple models with concurrent prompts and retrieves their responses.
@@ -94,13 +92,17 @@ class LLMs:
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = {}
                 for model_name, prompts in prompts_per_model.items():
-                    model = self.get_model(model_name)
-                    for index, prompt in prompts:
-                        futures[(index, model_name)] = executor.submit(self.get_response, prompt, model)
+                    if model_name in self.config.OLLAMA_MODEL_LIST:
+                        responses.update(self.query_ollama_models_sequentially(prompts, model_name))
+                    else:
+                        model = self.get_model(model_name)
+                        for index, prompt in prompts:
+                            futures[(index, model_name)] = executor.submit(self.get_response, prompt, model)
 
                 for key, future in futures.items():
                     try:
                         responses[key] = future.result()
+                        logging.info(f"Got response from {key[1]} at index {key[0]}")
                     except Exception as e:
                         logging.error(f"Failed to get response for {key}: {e}")
 
@@ -109,40 +111,38 @@ class LLMs:
         finally:
             return responses
 
-    def query_llms_parallel(self, prompt, model_names):
+
+    def query_ollama_models_sequentially(self, prompts, model_name):
         """
-        Invokes multiple models in parallel with the same prompt and retrieves their responses.
+        Queries Ollama models sequentially with given prompts and retrieves their responses.
 
         Parameters:
-        - prompt (str): The input prompt to be sent to the models.
-        - model_names (list): A list of model names to be invoked.
+        - prompts (list): A list of tuples, each containing an index and a prompt to be sent to the model.
+        - model_name (str): The name of the Ollama model to be invoked.
 
         Returns:
-        - dict: A dictionary with model names as keys and their responses as values.
+        - dict: A dictionary with keys as tuples of (index, model name) and their responses as values.
         """
         responses = {}
-        models = [(model_name, self.get_model(model_name)) for model_name in model_names]
-
-        with ThreadPoolExecutor() as executor:
-            future_to_model = {executor.submit(self.get_response, prompt, model): model_name for model_name, model in models if model}
-
-            for future in as_completed(future_to_model):
-                model_name = future_to_model[future]
-                try:
-                    response = future.result()
-                    responses[model_name] = response
-                except Exception as e:
-                    print(f"Error getting response from model {model_name}: {str(e)}")
-                    continue
+        model = self.get_model(model_name)
+        for index, prompt in prompts:
+            response = self.get_response(prompt, model)
+            responses[(index, model_name)] = response
+            logging.info(f"Got response from {model_name} at index {index}")
 
         return responses
 
 if __name__ == '__main__':
     import config
-    model_list = ["llama2", "mistral:instruct"]
     llms = LLMs(config)
-    responses = llms.ask_llms_parallel("Translate the sentence to German: 'I love programming'.", model_list)
-    for model_name, response in responses.items():
+    prompts_per_model = {
+        "psyche/Meta-Llama-3-70B-Instruct-awq": [(0, "Translate the sentence to German: 'I love programming'.")],
+        "gemma": [(0, "Translate the sentence to German: 'I love programming'.")],
+    }
+
+    responses = llms.query_llms(prompts_per_model)
+
+    for (index, model_name), response in responses.items():
         print(f"Response from {model_name}:")
         print(response)
         print("-------------------------")

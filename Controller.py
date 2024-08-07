@@ -1,5 +1,6 @@
 import config
 from Preprocessor.owasp_processor import OwaspProcessor
+from Preprocessor.cvefixes_processor import CVEFixesProcessor
 from Preprocessor.stratification import get_stratified_sample
 from PromptGenerator.generator import PromptGenerator
 from LLMsInterface.llms import LLMs
@@ -9,25 +10,26 @@ from ReportsGenerator.vulnEvaluator import VulnerabilityEvaluator
 import pandas as pd
 import logging
 import json
+import os
 
 class Controller:
     """
     Controller for managing the workflow of the benchmark.
 
     Parameters:
-    - data_dir_path (str): The path to the directory containing the OWASP examples.
+    - data_dir_path (str): The path to the directory containing the dataset.
     - table_name (str, optional): The name of the table to store the LLM responses in the database.
     - useCache (bool, optional): Flag indicating whether to use cached LLM responses. Defaults to True.
     - self_reflection (bool, optional): Flag indicating whether to perform self-reflection prompts. Defaults to False.
     - self_reflection_gt (bool, optional): Flag indicating whether to perform self-reflection prompts with ground truth. Defaults to False.
 
     Attributes:
-    - preprocessor (OwaspProcessor): An instance of the OwaspProcessor class for preprocessing OWASP examples.
+    - preprocessor (object): An instance of the appropriate preprocessor class for the dataset.
     - prompt_generator (PromptGenerator): An instance of the PromptGenerator class for generating prompts.
     - llm_interface (LLMs): An instance of the LLMs class for interacting with the LLM models.
     - response_parser (ResponseParser): An instance of the ResponseParser class for parsing LLM responses.
     - db (LLMResponseDB): An instance of the LLMResponseDB class for managing the LLM response database.
-    - examples (pandas.DataFrame): The loaded OWASP examples.
+    - examples (pandas.DataFrame): The loaded examples.
     - table_name (str): The name of the table to store the LLM responses in the database.
     - useCache (bool): Flag indicating whether to use cached LLM responses.
     - self_reflection (bool): Flag indicating whether to perform self-reflection on LLM responses.
@@ -36,7 +38,8 @@ class Controller:
     """
 
     def __init__(self, data_dir_path: str, table_name: str = None, useCache: bool = True, self_reflection: bool = False, self_reflection_gt: bool = False):
-        self.preprocessor = OwaspProcessor(data_dir_path)
+        self.data_dir_path = data_dir_path
+        self.preprocessor = None
         self.prompt_generator = PromptGenerator()
         self.llm_interface = LLMs(config)
         self.response_parser = ResponseParser()
@@ -48,22 +51,33 @@ class Controller:
         self.self_reflection_gt = self_reflection_gt
         logging.basicConfig(level=logging.INFO)
 
-    def load_examples(self, processing_options=None, stratification_options=None):
+    def load_examples(self, dataset_name: str, processing_options=None, stratification_options=None):
         """
-        Load and preprocess the OWASP examples.
+        Load and preprocess the examples based on the dataset name.
 
         Parameters:
+        - dataset_name (str): The name of the dataset to load.
         - processing_options (dict, optional): Options for preprocessing the examples. Defaults to None.
         - stratification_options (dict, optional): Options for stratifying the examples. Defaults to None.
-
         """
+        if dataset_name.lower() == 'owasp':
+            owasp_dir = os.path.join(self.data_dir_path, 'OWASP')
+            self.preprocessor = OwaspProcessor(owasp_dir)
+        elif dataset_name.lower() == 'cvefixes':
+            cvefixes_dir = os.path.join(self.data_dir_path, 'CVEfixes_v1.0.7')
+            self.preprocessor = CVEFixesProcessor(cvefixes_dir)
+        else:
+            logging.error(f"Unsupported dataset: {dataset_name}")
+            return
+
         examples = self.preprocessor.load_and_process_examples(processing_options)
+
         if stratification_options and stratification_options['stratify']:
             self.examples = get_stratified_sample(examples, stratification_options)
-            logging.info(f"Loaded stratified sample of {len(self.examples)} OWASP examples.")
+            logging.info(f"Loaded stratified sample of {len(self.examples)} examples from the {dataset_name} dataset.")
         else:
             self.examples = examples
-            logging.info(f"Loaded {len(self.examples)} OWASP examples.")
+            logging.info(f"Loaded {len(self.examples)} examples from the {dataset_name} dataset.")
 
     def get_prompt(self, code_snippet: str, prompt_type: str):
         """
@@ -217,22 +231,25 @@ class Controller:
 
 
 if __name__ == '__main__':
+    dataset_name = "cvefixes"
     prompt_type = "simple"
-    table_name = f"{prompt_type}_prompt_test"
-    model_names = [config.GROQ_MODEL_LIST[0]]
+    table_name = f"{dataset_name}_{prompt_type}_prompt_test"
+    model_names = [config.HOC_MODEL_LIST[0]]
     stratification_options = {
         "stratify": True,
-        "stratify_cols": ["category", "cwe"],
-        "test_size": 0.01,
+        "stratify_cols": ["cwe_name", "cwe"],
+        "test_size": 0.1,
         "random_state": 12
     }
     self_reflection = False
-    self_reflection_gt = True
+    self_reflection_gt = False
+
     controller = Controller(config.DATA_DIR_PATH, table_name, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
-    controller.load_examples(stratification_options=stratification_options)
+    controller.load_examples(dataset_name, stratification_options=stratification_options)
+    controller.examples.to_csv(f'./{table_name}_examples.csv')
     controller.send_to_llm(model_names, prompt_type)
     
-    controller.generate_reports(prompt_type, experiment="default")
+    controller.generate_reports(prompt_type, experiment="test")
     controller.db.close()
 
     logging.info("Done.")

@@ -39,6 +39,7 @@ def run_controller(args, paths, config=None):
         prompt_types = [ptype.strip() for ptype in config['General']['prompt_type'].split(',')]
         self_reflection = config.getboolean('General', 'self_reflection', fallback=False)
         self_reflection_gt = config.getboolean('General', 'self_reflection_gt', fallback=False)
+        dataset_name = config['General'].get('dataset_name', 'owasp')
         model_names = [name.strip() for name in config['LLM']['model_names'].split(',')]
         processing_options = {key: config['Preprocessing Options'].getboolean(key)
                               for key in config['Preprocessing Options']}
@@ -65,7 +66,7 @@ def run_controller(args, paths, config=None):
         stratification_options = None
 
     controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
-    controller.load_examples(processing_options, stratification_options)
+    controller.load_examples(dataset_name , processing_options, stratification_options)
 
     for prompt_type in prompt_types:
         table_name = f"{args.experiment if args.experiment else 'default'}_{prompt_type}_prompt"

@@ -1,24 +1,20 @@
 import pandas as pd
+import json
+import re
 
 class ResponseParser:
     """
     A class for parsing and processing LLM response data.
-
-    Parameters:
-    - delimiter (str): The delimiter used to separate key-value pairs in the response string.
-
-    Attributes:
-    - delimiter (str): The delimiter used to separate key-value pairs in the response string.
-
     """
-
-    def __init__(self, delimiter='|'):
-        self.delimiter = delimiter
 
     def parse_response(self, response):
         """
         Parses a response string and returns a dictionary with vulnerability details.
-        {Vulnerability: <True or False>, Vulnerability Type: <CWE_number>, Vulnerability Name: <Name of CWE>}
+        {
+          "vulnerability": <true or false>,
+          "vulnerability_type": <CWE_number>,
+          "vulnerability_name": <Name of CWE>
+        }
 
         Parameters:
         - response (str): The response string to be parsed.
@@ -30,18 +26,37 @@ class ResponseParser:
         if response is None:
             return {}
         
-        parsed_data = {}
+        # Replace any case variations of True/False with lowercase true/false using regex
+        response = re.sub(r'\btrue\b', 'true', response, flags=re.IGNORECASE)
+        response = re.sub(r'\bfalse\b', 'false', response, flags=re.IGNORECASE)
+        
         try:
-            parts = response.split(self.delimiter)
-            for part in parts:
-                if ':' in part:
-                    key, value = part.strip().split(':', 1)
-                    parsed_data[key.strip()] = value.strip()
-
-        except ValueError as e:
+            parsed_data = json.loads(response)
+        except json.JSONDecodeError as e:
             print(f"Error parsing response: {response}. Error: {e}")
-            # pass
+            return {}
+        
+        # Extract CWE if vulnerability_type is a string
+        if 'vulnerability_type' in parsed_data and isinstance(parsed_data['vulnerability_type'], str):
+            parsed_data['vulnerability_type'] = self.extract_cwe(parsed_data['vulnerability_type'])
+        
         return parsed_data
+
+    def extract_cwe(self, cwe_string):
+        """
+        Extracts the CWE number from a vulnerability_type in case of non-integer response.
+
+        Parameters:
+        - cwe_string (str): predicted vulnerability_type.
+
+        Returns:
+        - int: The extracted CWE number or None if no CWE is found.
+        """
+        match = re.search(r'(?i)cwe-?(\d+)|\b(\d+)\b', cwe_string)
+        if match:
+            cwe_number = match.group(1) if match.group(1) else match.group(2)
+            return int(cwe_number)
+        return None
 
     def responses_to_dataframe(self, responses, prompt_type):
         """
@@ -66,23 +81,23 @@ class ResponseParser:
         df = pd.DataFrame(responses_list)
         df.set_index('Test Name', inplace=True)
 
-        df['predicted_vulnerability'] = df['Vulnerability'].str.strip().str.lower().map({'true': True, 'false': False})
-        df['predicted_vulnerability_name'] = df.get('Vulnerability Name', 'None')
+        df['predicted_vulnerability'] = df.get('vulnerability', None)
+        df['predicted_vulnerability_name'] = df.get('vulnerability_name', 'None')
 
         if prompt_type == 'vulnerability_names':
             df['predicted_cwe'] = 'None'
         else:
-            df['predicted_cwe'] = df.get('Vulnerability Type', 'None')
+            df['predicted_cwe'] = df.get('vulnerability_type', 'None')
 
         if prompt_type == 'explanatory_insights':
-            df['explanation'] = df.get('Explanation', 'None')
+            df['explanation'] = df.get('explanation', 'None')
         if prompt_type == 'solution_oriented':            
-            df['solution'] = df.get('Solution', 'None')
+            df['solution'] = df.get('solution', 'None')
 
-        df.drop(columns=['Vulnerability', 'Vulnerability Type','Vulnerability Name'], inplace=True, errors='ignore')
+        df.drop(columns=['vulnerability', 'vulnerability_type', 'vulnerability_name'], inplace=True, errors='ignore')
 
         return df
-    
+
     def save(self, df, filepath):
         """
         Saves a DataFrame to a CSV file.
@@ -97,16 +112,16 @@ class ResponseParser:
 if __name__ == '__main__':
     responses = {
         'BenchmarkTest00001': {
-            'llama3-8b-8192': 'Vulnerability: true | Vulnerability Type: CWE-22: Improper Limitation of a Path or Directory | Vulnerability Name: Path Traversal | Explanation: Path traversal vulnerability allows unauthorized file access.',
-            'mixtral-8x7b-32768': "Vulnerability: TRUE | Vulnerability Type: CWE-22 | Vulnerability Name: Path Traversal | Solution: Validate and sanitize all user inputs to ensure the security of file paths."
+            'llama3-8b-8192': '{"vulnerability": True, "vulnerability_type": 22, "vulnerability_name": "Path Traversal"}',
+            'mixtral-8x7b-32768': '{"vulnerability": True, "vulnerability_type": "CWE-22", "vulnerability_name": "Path Traversal"}'
         },
         'BenchmarkTest00002': {
-            'llama3-8b-8192': 'Vulnerability: True | Vulnerability Type: CWE-22: Improper Limitation of a Path to a Predictable String within a Non-Canonical Path | Vulnerability Name: Directory Traversal | Explanation: This could potentially allow an attacker to access restricted files.',
-            'mixtral-8x7b-32768': 'Vulnerability: True | Vulnerability Type: CWE-22 | Vulnerability Name: Path Traversal | Solution: Implement rigorous path normalization before processing user inputs.'
+            'llama3-8b-8192': '{"vulnerability": true, "vulnerability_type": "CWE-22: Improper Limitation of a Path to a Predictable String within a Non-Canonical Path", "vulnerability_name": "Directory Traversal"}',
+            'mixtral-8x7b-32768': '{"vulnerability": true, "vulnerability_type": 22, "vulnerability_name": "Path Traversal"}'
         }
     }
 
     parser = ResponseParser()
     df = parser.responses_to_dataframe(responses, "simple")
     print(df)
-    # parser.save(df, './response_df.csv')
+    parser.save(df, './response_df.csv')

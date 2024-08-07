@@ -1,9 +1,8 @@
 import os
 import re
-import random
 import shutil
 import pandas as pd
-from Preprocessor.obfuscation import obfuscate
+from Preprocessor.obfuscation import obfuscate, rename
 from Preprocessor.owasp_cache import CacheManager
 
 class OwaspProcessor:
@@ -11,7 +10,7 @@ class OwaspProcessor:
     Process OWASP code examples.
 
     Parameters:
-    - data_dir (str): The directory path where the code examples and other files are located.
+    - owasp_dir (str): The directory path where the OWASP dataset is located.
     - useCache (bool, optional): Flag indicating whether to use caching for processed examples. Defaults to True.
     - saveFiles (bool, optional): Flag indicating whether to save obfuscated files. Defaults to False.
 
@@ -19,19 +18,17 @@ class OwaspProcessor:
     - examples_dir (str): The directory path where the original code examples are located.
     - obfuscated_dir (str): The directory path where the obfuscated code examples will be saved.
     - groundTruth (str): The path to the file containing the ground truth.
-    - dummy_name_map (dict): A dictionary mapping original names to dummy names.
     - cache_manager (CacheManager): An instance of the CacheManager class for managing caching.
     - useCache (bool): Flag indicating whether to use caching for processed examples.
     - saveFiles (bool): Flag indicating whether to save obfuscated files.
     - processing_options (dict): A dictionary containing the processing options.
     """
 
-    def __init__(self, data_dir, useCache=True, saveFiles=False):
-        self.examples_dir = os.path.join(data_dir, 'owasp_code_examples')
-        self.obfuscated_dir = os.path.join(data_dir, 'owasp_code_examples_obfuscated')
-        self.groundTruth = os.path.join(data_dir, 'expectedresults-1.2.csv')
-        self.dummy_name_map = {}
-        self.cache_manager = CacheManager(data_dir)
+    def __init__(self, owasp_dir, useCache=True, saveFiles=False):
+        self.examples_dir = os.path.join(owasp_dir, 'examples')
+        self.obfuscated_dir = os.path.join(owasp_dir, 'obfuscated')
+        self.groundTruth = os.path.join(owasp_dir, 'expectedresults-1.2.csv')
+        self.cache_manager = CacheManager(owasp_dir)
         self.useCache = useCache
         self.saveFiles = saveFiles
         self.processing_options = None
@@ -97,7 +94,7 @@ class OwaspProcessor:
         - str: The Java code with benchmark names replaced.
         """
         pattern = re.compile(r'\b(owasp|benchmark)\b', re.IGNORECASE)
-        return pattern.sub(self.replace_with_dummy, java_code)
+        return pattern.sub(lambda match: self.replace_with_dummy(match, 'suite'), java_code)
     
     def replace_cwe_names(self, java_code):
         """
@@ -114,34 +111,22 @@ class OwaspProcessor:
             'xss', 'securecookie', 'ldapi', 'weakrand', 'xpathi', 'sqli'
         ]
         pattern = re.compile(r'\b(' + '|'.join(cwe_names) + r')\b', re.IGNORECASE)
-        return pattern.sub(self.replace_with_dummy, java_code)
+        return pattern.sub(lambda match: self.replace_with_dummy(match, 'cat'), java_code)
 
-    def replace_with_dummy(self, match):
+    def replace_with_dummy(self, match, prefix):
         """
         Replaces the matched keyword with a dummy name.
 
         Parameters:
         - match (re.Match): The matched keyword.
+        - prefix (str): The prefix to be used for renaming.
 
         Returns:
-        - str: The dummy name.
+        - str: The renamed name (prefix_{hash of keyword}).
         """
         keyword = match.group().lower()
-        if keyword not in self.dummy_name_map:
-            self.dummy_name_map[keyword] = self.generate_random_name()
-        return self.dummy_name_map[keyword]
+        return rename(keyword, prefix)
 
-    def generate_random_name(self):
-        """
-        Generates a random dummy name.
-
-        Returns:
-        - str: The random dummy name.
-        """
-        names = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']
-        adjs = ['Quick', 'Bright', 'Silent', 'Clever', 'Brave']
-        return f"{random.choice(adjs)}{random.choice(names)}{random.randint(100, 999)}"
-    
     def obfuscate_code(self, java_code):
         """
         Obfuscates the given Java code.
@@ -275,7 +260,7 @@ class OwaspProcessor:
 
 
 if __name__ == "__main__":
-    data_dir = '../CodeExamples'
+    owasp_dir = 'CodeExamples/OWASP'
     
     processing_options = {
         'obfuscate_code': True,
@@ -286,6 +271,6 @@ if __name__ == "__main__":
         'replace_cwe_names': True
     }
     
-    owasp = OwaspProcessor(data_dir, useCache=True, saveFiles=True)
+    owasp = OwaspProcessor(owasp_dir, useCache=False, saveFiles=True)
     df = owasp.load_and_process_examples(processing_options)
     print(df.head())

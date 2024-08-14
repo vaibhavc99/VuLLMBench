@@ -7,4 +7,4 @@ langchain-groq
 scikit-learn
 javalang
 plotly
-dash
+streamlit

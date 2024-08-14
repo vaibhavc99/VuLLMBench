@@ -3,6 +3,8 @@ import argparse
 from pathlib import Path
 import configparser
 from Controller import Controller
+from Utils.configure_logging import configure_logging
+import subprocess
 
 def main():
     """
@@ -10,16 +12,23 @@ def main():
     Parses arguments, loads paths and configurations, and runs the controller.
     """
     args = parse_arguments()
+    
+    if args.dashboard:
+        run_dashboard()
+        return
+
     paths = load_paths(args)
+    log_file = paths['ExperimentPath'] / f"{args.experiment}.log" if args.experiment else "vullmbench.log"
+
     try:
         if args.experiment:
             config = load_config(paths['ConfigPath'])
-            configure_logging(config)
-            logging.info(f"Experiment {args.experiment} started...")
+            logger = configure_logging("VuLLMBench", log_file ,config)
+            logger.info(f"Experiment {args.experiment} started...")
             run_controller(args, paths, config)
-            logging.info(f"Experiment {args.experiment} finished.")
+            logger.info(f"Experiment {args.experiment} finished.")
         else:
-            configure_logging()
+            logger = configure_logging("VuLLMBench")
             run_controller(args, paths)
 
     except Exception as e:
@@ -59,14 +68,15 @@ def run_controller(args, paths, config=None):
         prompt_types = args.prompt_types
         self_reflection = args.self_reflection
         self_reflection_gt = args.self_reflection_gt
+        dataset_name = args.dataset_name
         model_names = args.model_names
         processing_options = {option: False for option in PROCESSING_OPTIONS}
         for option in args.processing_options:
             processing_options[option] = True
         stratification_options = None
 
-    controller = Controller(data_dir_path=paths['DataPath'], useCache=use_cache, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
-    controller.load_examples(dataset_name , processing_options, stratification_options)
+    controller = Controller(data_dir_path=paths['DataPath'], dataset_name=dataset_name, useCache=use_cache, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
+    controller.load_examples(processing_options, stratification_options)
 
     for prompt_type in prompt_types:
         table_name = f"{args.experiment if args.experiment else 'default'}_{prompt_type}_prompt"
@@ -75,6 +85,18 @@ def run_controller(args, paths, config=None):
         controller.generate_reports(prompt_type, args.experiment if args.experiment else 'default')
     
     controller.db.close()
+
+def run_dashboard():
+    """
+    Runs the Evaluation dashboard.
+    """
+    # subprocess.run(["streamlit", "run", "ReportsGenerator/dashboard.py"])
+    try:
+        process = subprocess.Popen(["streamlit", "run", "ReportsGenerator/dashboard.py"])
+        process.communicate()
+    except KeyboardInterrupt:
+        print("Closing the Dashboard...")
+        process.terminate()
 
 def load_paths(args):
     """
@@ -129,6 +151,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(description='Vulnerability Detection Benchmark')
     parser.add_argument('-d', '--data', help='Path to the directory containing the data (Code Examples)', default='./CodeExamples')
+    parser.add_argument('--dataset_name', help='Name of the dataset to use', default='owasp')
     parser.add_argument('-m', '--model_names', nargs='+', help='Names of the models to use', default=['llama3-8b-8192'])
     parser.add_argument('--prompt_types', nargs='+', choices=['simple', 'vulnerability_specific', 'vulnerability_names', 'explanatory_insights', 'solution_oriented'], help='Types of prompts to use for LLM queries', default=['simple'])
     parser.add_argument('--no_cache', action='store_true', help='Do not use cache')
@@ -136,27 +159,9 @@ def parse_arguments():
     parser.add_argument('--processing_options', nargs='*', choices=PROCESSING_OPTIONS, help='Processing options to apply for the examples', default=['remove_multiline_comments'])
     parser.add_argument('--self_reflection', action='store_true', help='Enable to perform self-reflection on LLM responses.')
     parser.add_argument('--self_reflection_gt', action='store_true', help='Enable to perform self-reflection on LLM responses with ground truth.')
+    parser.add_argument('--dashboard', action='store_true', help='Run the Evaluation dashboard')
     
     return parser.parse_args()
-
-def configure_logging(config=None):
-    """
-    Configures logging based on the provided configuration.
-    
-    Parameters:
-    - config: Configuration object if provided, else None
-    """
-    if config:
-        logging_options = {
-            'debug': logging.DEBUG,
-            'info': logging.INFO,
-            'warning': logging.WARNING,
-            'error': logging.ERROR,
-            'critical': logging.CRITICAL
-        }
-        logging.basicConfig(level=logging_options[config['General']['logging']])
-    else:
-        logging.basicConfig(level=logging.INFO)
 
 if __name__ == '__main__':
     PROCESSING_OPTIONS = [

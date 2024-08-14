@@ -6,9 +6,9 @@ DB_PATH = "./llms_responses.db"
 
 OPENAI_API_KEY = ""
 
-OLLAMA_HOST = "http://localhost:11434"
+OLLAMA_HOST = "http://hoc-lx-gpu02.ad.iem-hoc.de:8083"
 
-GROQ_API_KEY = ""
+GROQ_API_KEY = "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"
 
 OPENAI_MODEL_LIST = [
     "gpt-3.5-turbo",
@@ -16,6 +16,7 @@ OPENAI_MODEL_LIST = [
 ]
 
 OLLAMA_MODEL_LIST = [
+    "llama3.1:70b",
     "llama3",
     "llama2",
     "codellama",

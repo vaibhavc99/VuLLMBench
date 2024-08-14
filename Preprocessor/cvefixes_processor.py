@@ -9,34 +9,52 @@ class CVEFixesProcessor:
 
     Parameters:
     - cvefixes_dir (str): The directory path where the CVE fixes dataset is located.
+    - language (str): The programming language of the CVE fixes dataset (e.g., 'java', 'python', 'c', 'cpp', 'js').
 
     Attributes:
     - cvefixes_dir (str): The directory path where the CVE fixes dataset is located.
+    - language (str): The programming language of the CVE fixes dataset.
     - examples_csv_path (str): The path to the CSV file containing CVE fixes examples by file.
     - method_examples_csv_path (str): The path to the CSV file containing CVE fixes examples by method.
     - top_25_cwes (list): The top 25 CWE IDs.
     """
 
-    def __init__(self, cvefixes_dir):
+    def __init__(self, cvefixes_dir: str, language: str = 'java'):
         self.cvefixes_dir = cvefixes_dir
-        self.examples_csv_path = os.path.join(cvefixes_dir, 'Output/cvefixes_java.csv')
-        self.method_examples_csv_path = os.path.join(cvefixes_dir, 'Output/cvefixes_java_method.csv')
+        self.language = language.lower()
+
+        # Set paths based on the selected language
+        self.examples_csv_path = os.path.join(cvefixes_dir, f'Output/cvefixes_{self.language}.csv')
+        self.method_examples_csv_path = os.path.join(cvefixes_dir, f'Output/cvefixes_{self.language}_method.csv')
         self.top_25_cwes = top_25_cwe_ids
 
-    def remove_multiline_comments(self, java_code):
+    def remove_comments(self, code):
         """
-        Removes multiline comments from the given Java code.
+        Removes all comments (both single-line and multi-line) from the given code based on the language.
 
         Parameters:
-        - java_code (str): The Java code.
+        - code (str): The code.
 
         Returns:
-        - str: The Java code with multiline comments removed.
+        - str: The code with all comments removed.
         """
-        if not isinstance(java_code, str):
-            return java_code
-        pattern = re.compile(r'/\*.*?\*/', re.DOTALL)
-        cleaned_code = re.sub(pattern, '', java_code)
+        if not isinstance(code, str):
+            return code
+
+        # Regular expressions for different languages
+        if self.language in {'java', 'c', 'cpp', 'js'}:
+            multiline_pattern = re.compile(r'/\*.*?\*/', re.DOTALL)  # Matches multiline comments
+            singleline_pattern = re.compile(r'//.*?(?=\n|$)')  # Matches single-line comments
+        elif self.language == 'python':
+            multiline_pattern = re.compile(r'\'\'\'.*?\'\'\'|\"\"\".*?\"\"\"', re.DOTALL)  # Matches multiline comments
+            singleline_pattern = re.compile(r'#.*?(?=\n|$)')  # Matches single-line comments
+        else:
+            raise ValueError(f"Unsupported language: {self.language}")
+
+        # Remove comments
+        code_no_multiline = re.sub(multiline_pattern, '', code)
+        cleaned_code = re.sub(singleline_pattern, '', code_no_multiline)
+
         return cleaned_code
 
     def load_and_process_examples(self, processing_options=None):
@@ -71,8 +89,8 @@ class CVEFixesProcessor:
         processed_snippets = []
         cwe_ids = []
         for index, row in cvefixes_df.iterrows():
-            java_code = row['code']
-            processed_code = self.remove_multiline_comments(java_code)
+            code = row['code']
+            processed_code = self.remove_comments(code)
             processed_snippets.append(processed_code)
 
             try:
@@ -89,13 +107,14 @@ class CVEFixesProcessor:
             top_cwes = [int(cwe.split("-")[-1].strip()) for cwe in self.top_25_cwes]
             cvefixes_df = cvefixes_df[cvefixes_df['cwe'].isin(top_cwes)]
 
-        # cvefixes_df.reset_index(inplace=True)
-        # cvefixes_df.rename(columns={'index': 'test_number'}, inplace=True)
-        # return cvefixes_df[['test_number', 'cve_id', 'cwe', 'cwe_name', 'code_snippet', 'real_vulnerability']]
+        cvefixes_df.reset_index(inplace=True)
+        cvefixes_df.index += 1                                              # Start index from 1
+        cvefixes_df.index = cvefixes_df.index.map(lambda x: f"Test{x}")     # Prepend "Test" to the index
+        cvefixes_df.index.name = 'test_name'
 
         return cvefixes_df[['cwe', 'cwe_name', 'real_vulnerability', 'cve_id', 'code_snippet']]
 
-    def save_processed_examples(self, processed_df, examples_type):
+    def save_processed_examples(self, processed_df: pd.DataFrame, examples_type):
         """
         Saves the processed DataFrame as a CSV file.
 
@@ -103,18 +122,19 @@ class CVEFixesProcessor:
         - processed_df (pd.DataFrame): The processed examples DataFrame.
         - examples_type (str): Type of examples processed ('file' or 'method').
         """
-        processed_csv_path = os.path.join(self.cvefixes_dir, f'processed_cvefixes_{examples_type}.csv')
+        processed_csv_path = os.path.join(self.cvefixes_dir, f'processed_cvefixes_{examples_type}_{self.language}.csv')
         processed_df.to_csv(processed_csv_path)
 
 if __name__ == "__main__":
     cvefixes_dir = 'CodeExamples/CVEfixes_v1.0.7'
+    language = 'java'
     processing_options = {
         'top_25_cwe': True,
         'file_examples': True,
         'method_examples': False
     }
 
-    cve_processor = CVEFixesProcessor(cvefixes_dir)
+    cve_processor = CVEFixesProcessor(cvefixes_dir, language=language)
     processed_df = cve_processor.load_and_process_examples(processing_options=processing_options)
     examples_type = 'file' if processing_options.get('file_examples', False) else 'method'
     cve_processor.save_processed_examples(processed_df, examples_type)

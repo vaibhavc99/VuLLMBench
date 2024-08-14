@@ -1,4 +1,4 @@
-import config
+import Utils.model_config as model_config
 from Preprocessor.owasp_processor import OwaspProcessor
 from Preprocessor.cvefixes_processor import CVEFixesProcessor
 from Preprocessor.stratification import get_stratified_sample
@@ -8,7 +8,7 @@ from LLMsInterface.responseDB import LLMResponseDB
 from ReportsGenerator.responseParser import ResponseParser
 from ReportsGenerator.vulnEvaluator import VulnerabilityEvaluator
 import pandas as pd
-import logging
+from Utils.configure_logging import configure_logging
 import json
 import os
 
@@ -18,6 +18,7 @@ class Controller:
 
     Parameters:
     - data_dir_path (str): The path to the directory containing the dataset.
+    - dataset_name (str): The name of the dataset to use.
     - table_name (str, optional): The name of the table to store the LLM responses in the database.
     - useCache (bool, optional): Flag indicating whether to use cached LLM responses. Defaults to True.
     - self_reflection (bool, optional): Flag indicating whether to perform self-reflection prompts. Defaults to False.
@@ -37,47 +38,48 @@ class Controller:
 
     """
 
-    def __init__(self, data_dir_path: str, table_name: str = None, useCache: bool = True, self_reflection: bool = False, self_reflection_gt: bool = False):
+    def __init__(self, data_dir_path: str, dataset_name: str, table_name: str = None, useCache: bool = True, self_reflection: bool = False, self_reflection_gt: bool = False):
         self.data_dir_path = data_dir_path
+        self.dataset_name = dataset_name
         self.preprocessor = None
         self.prompt_generator = PromptGenerator()
-        self.llm_interface = LLMs(config)
+        self.llm_interface = LLMs(model_config)
         self.response_parser = ResponseParser()
-        self.db = LLMResponseDB(config.DB_PATH)
+        self.db = LLMResponseDB(model_config.DB_PATH)
         self.examples = None
         self.table_name = table_name
         self.useCache = useCache
         self.self_reflection = self_reflection
         self.self_reflection_gt = self_reflection_gt
-        logging.basicConfig(level=logging.INFO)
+        self.logger = configure_logging(__name__)
 
-    def load_examples(self, dataset_name: str, processing_options=None, stratification_options=None):
+    def load_examples(self, processing_options=None, stratification_options=None):
         """
         Load and preprocess the examples based on the dataset name.
 
         Parameters:
-        - dataset_name (str): The name of the dataset to load.
         - processing_options (dict, optional): Options for preprocessing the examples. Defaults to None.
         - stratification_options (dict, optional): Options for stratifying the examples. Defaults to None.
         """
-        if dataset_name.lower() == 'owasp':
+        if self.dataset_name.lower() == 'owasp':
             owasp_dir = os.path.join(self.data_dir_path, 'OWASP')
             self.preprocessor = OwaspProcessor(owasp_dir)
-        elif dataset_name.lower() == 'cvefixes':
+        elif self.dataset_name.lower().startswith('cvefixes'):
             cvefixes_dir = os.path.join(self.data_dir_path, 'CVEfixes_v1.0.7')
-            self.preprocessor = CVEFixesProcessor(cvefixes_dir)
+            language = self.dataset_name.split('_')[-1]
+            self.preprocessor = CVEFixesProcessor(cvefixes_dir, language)
         else:
-            logging.error(f"Unsupported dataset: {dataset_name}")
+            self.logger.error(f"Unsupported dataset: {self.dataset_name}")
             return
 
         examples = self.preprocessor.load_and_process_examples(processing_options)
 
         if stratification_options and stratification_options['stratify']:
             self.examples = get_stratified_sample(examples, stratification_options)
-            logging.info(f"Loaded stratified sample of {len(self.examples)} examples from the {dataset_name} dataset.")
+            self.logger.info(f"Loaded stratified sample of {len(self.examples)} examples from the {self.dataset_name} dataset.")
         else:
             self.examples = examples
-            logging.info(f"Loaded {len(self.examples)} examples from the {dataset_name} dataset.")
+            self.logger.info(f"Loaded {len(self.examples)} examples from the {self.dataset_name} dataset.")
 
     def get_prompt(self, code_snippet: str, prompt_type: str):
         """
@@ -104,7 +106,7 @@ class Controller:
 
         """
         if self.examples is None:
-            logging.error("Examples not loaded.")
+            self.logger.error("Examples not loaded.")
             return
 
         self.prepare_and_query_llms(model_names, prompt_type)
@@ -142,7 +144,7 @@ class Controller:
             ]
 
         if not any(missing_indices.values()):
-            logging.info(f"Responses for the '{prompt_type}' prompt by models {model_names} already exist in the database. Skipping LLM calls.")
+            self.logger.info(f"Responses for the '{prompt_type}' prompt by models {model_names} already exist in the database. Skipping LLM calls.")
             return
 
         prompts_per_model = {}
@@ -178,9 +180,9 @@ class Controller:
             self.db.insert_response(table_name, index, prompt, model_name, response)
             
             if reflection:
-                logging.info(f"A self-reflection response by {model_name} for {index} is stored in database.")
+                self.logger.info(f"A self-reflection response by {model_name} for {index} is stored in database.")
             else:
-                logging.info(f"A response by {model_name} for {index} is stored in database.")
+                self.logger.info(f"A response by {model_name} for {index} is stored in database.")
 
     def generate_reports(self, prompt_type: str, experiment: str = None):
         """
@@ -191,7 +193,7 @@ class Controller:
         - experiment (str, optional): The name of the experiment.
 
         """
-        logging.info(f"Generating reports for Experiment-{experiment} based on LLM responses.")
+        self.logger.info(f"Generating reports for Experiment-{experiment} based on LLM responses.")
 
         # Standard evaluation
         self.evaluate_and_save_results(prompt_type, experiment)
@@ -222,11 +224,11 @@ class Controller:
         df = self.response_parser.responses_to_dataframe(responses, prompt_type)
 
         evaluator = VulnerabilityEvaluator(df, self.examples)
-        results = evaluator.evaluate_by_model(experiment, prompt_type)
-        print(f"\nEvaluation Results: \n{results}")
+        results = evaluator.evaluate_by_model(experiment, self.dataset_name, prompt_type)
+        # print(f"\nEvaluation Results: \n{results}")
 
         results_json = json.dumps(results, indent=4)
-        with open(f'./Evaluation/{experiment}/eval_results_{prompt_type}-prompt.json', 'w') as file:
+        with open(f'./Evaluation/{experiment}/{self.dataset_name}-{prompt_type}.json', 'w') as file:
             file.write(results_json)
 
 
@@ -234,7 +236,7 @@ if __name__ == '__main__':
     dataset_name = "cvefixes"
     prompt_type = "simple"
     table_name = f"{dataset_name}_{prompt_type}_prompt_test"
-    model_names = [config.HOC_MODEL_LIST[0]]
+    model_names = [model_config.HOC_MODEL_LIST[0]]
     stratification_options = {
         "stratify": True,
         "stratify_cols": ["cwe_name", "cwe"],
@@ -244,12 +246,10 @@ if __name__ == '__main__':
     self_reflection = False
     self_reflection_gt = False
 
-    controller = Controller(config.DATA_DIR_PATH, table_name, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
-    controller.load_examples(dataset_name, stratification_options=stratification_options)
+    controller = Controller(model_config.DATA_DIR_PATH, dataset_name, table_name, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
+    controller.load_examples(stratification_options=stratification_options)
     controller.examples.to_csv(f'./{table_name}_examples.csv')
     controller.send_to_llm(model_names, prompt_type)
     
     controller.generate_reports(prompt_type, experiment="test")
     controller.db.close()
-
-    logging.info("Done.")

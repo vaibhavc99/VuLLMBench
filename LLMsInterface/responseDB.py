@@ -1,6 +1,7 @@
 import sqlite3
 import json
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from Utils.configure_logging import configure_logging
 
 class LLMResponseDB:
     """
@@ -21,6 +22,7 @@ class LLMResponseDB:
         """
         self.db = sqlite3.connect(db_path)
         self.cursor = self.db.cursor()
+        self.logger = configure_logging("LLMResponseDB")
 
     def ensure_table_exists(self, table):
         """
@@ -62,7 +64,7 @@ class LLMResponseDB:
         self.cursor.execute(f"PRAGMA table_info({table});")
         columns = [info[1] for info in self.cursor.fetchall()]
         return column.strip('"') in columns
-
+    
     def insert_response(self, table, test_name, prompt, model_name, response):
         """
         Inserts a response into the specified table.
@@ -83,16 +85,26 @@ class LLMResponseDB:
 
         self.ensure_column_exists(table, "prompt")
         self.ensure_column_exists(table, model_column)
-        
-        self.cursor.execute(f"SELECT {model_column} FROM {table} WHERE test_name = ?", (test_name,))
 
+        self.cursor.execute(f"SELECT prompt, {model_column} FROM {table} WHERE test_name = ?", (test_name,))
         row = self.cursor.fetchone()
+
         if row is None:
-            self.cursor.execute(f"INSERT INTO {table} (test_name, prompt, {model_column}) VALUES (?, ?, ?)", (test_name, prompt_json, response))
+            # No existing entry for the test_name, so insert a new row
+            self.cursor.execute(f"INSERT INTO {table} (test_name, prompt, {model_column}) VALUES (?, ?, ?)", 
+                                (test_name, prompt_json, response))
         else:
-            if row[0] is None:
-                self.cursor.execute(f"UPDATE {table} SET prompt = ? WHERE test_name = ?", (prompt_json, test_name))
-            self.cursor.execute(f"UPDATE {table} SET {model_column} = ? WHERE test_name = ?", (response, test_name))
+            existing_prompt, existing_response = row
+            
+            if existing_prompt != prompt_json:
+                # Prompts do not match, update the prompt and response
+                self.cursor.execute(f"UPDATE {table} SET prompt = ?, {model_column} = ? WHERE test_name = ?", 
+                                    (prompt_json, response, test_name))
+            else:
+                # Prompts match, just update the response if it's not already set
+                if existing_response is None:
+                    self.cursor.execute(f"UPDATE {table} SET {model_column} = ? WHERE test_name = ?", 
+                                        (response, test_name))
 
         self.db.commit()
     
@@ -117,7 +129,7 @@ class LLMResponseDB:
             else:
                 return False
         except Exception as e:
-            print(e)
+            self.logger.error(f"Error checking if response exists: {str(e)}")
             return False
     
     def get_all_responses(self, table):

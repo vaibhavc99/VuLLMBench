@@ -1,7 +1,6 @@
 import ollama
-import logging
-        
-logging.basicConfig(level=logging.INFO)
+from tqdm import tqdm
+from Utils.configure_logging import configure_logging
 
 class OllamaUtils:
     """
@@ -15,6 +14,7 @@ class OllamaUtils:
     """
     def __init__(self, base_url):
         self.client = ollama.Client(base_url)
+        self.logger = configure_logging("OllamaUtils")
 
     def is_running(self):
         """
@@ -25,11 +25,11 @@ class OllamaUtils:
         """
         try:
             self.client._request('GET', '')
-            logging.info("Connection to Ollama Host is successful.")
+            self.logger.info("Connection to Ollama Host is successful.")
             return True
         
         except Exception as e:
-            logging.error(f"Failed to connect to Ollama Host: {e}")
+            self.logger.error(f"Failed to connect to Ollama Host: {e}")
             return False
 
     def model_available(self, model):
@@ -44,20 +44,69 @@ class OllamaUtils:
         """
         try:
             self.client.show(model)
-            logging.info(f"Model {model} is available.")
+            self.logger.info(f"Model {model} is available.")
             return True
         
         except Exception as e:
             if (str(e) == f"model '{model}' not found"):
-                logging.error(f"Model {model} not available.")
-                logging.info(f"Attempting to download {model}...")
-                self.client.pull(model)
-                logging.info(f"Model downloaded: {model}")
+                self.logger.error(f"Model {model} not available.")
+                user_input = input("Do you want to download it? (yes/no): ").strip().lower()
+                if user_input in ['yes', 'y']:
+                    self.download_model(model)
             else:
-                logging.error(f"Failed to connect to Ollama Host: {e}")
+                self.logger.error(f"Failed to connect to Ollama Host: {e}")
                 return False
+            
+    def list_models(self):
+        models = self.client.list()
+        model_names = [model['name'] for model in models['models']]
+        return model_names
 
+    def download_model(self, model_name):
+        if model_name in self.list_models():
+            self.logger.info(f"Model {model_name} already exists")
+        else:
+            stream = self.client.pull(model=model_name, stream=True)
+            total_size = None
+            progress_bar = None
+            for chunk in stream:
+                if 'status' in chunk and 'total' in chunk and 'completed' in chunk:
+                    if total_size is None:
+                        total_size = chunk['total']
+                        progress_bar = tqdm(total=total_size, unit='B', unit_scale=True, desc=f"Downloading {model_name}")
+                    completed = chunk['completed']
+                    progress_bar.n = completed
+                    progress_bar.update(0)
+                else:
+                    print(chunk)
+
+            if progress_bar is not None:
+                progress_bar.close()
+
+            if model_name in self.list_models():
+                self.logger.info(f"Model {model_name} downloaded successfully")
+
+    def remove_model(self, model_name):
+        if model_name in self.list_models():
+            self.client.delete(model=model_name)
+            self.logger.info(f"Model {model_name} removed successfully")
+        else:
+            self.logger.info(f"Model {model_name} does not exist")
+    
+    def show_running_models(self):
+        running_models = self.client.ps()
+        model_names = [model['name'] for model in running_models['models']]
+        return model_names
+
+    def unload_model(self, model_name):
+        if model_name in self.show_running_models():
+            self.client.generate(model=model_name, keep_alive=0)
+            self.logger.info(f"Model {model_name} unloaded successfully")
+        else:
+            self.logger.info(f"Model {model_name} is not running")
+    
 if __name__ == '__main__':  
-    ol = OllamaUtils("http://localhost:11434")
-    # ol.is_running()
-    ol.model_available('llama3')
+    base_url = "http://hoc-lx-gpu02.ad.iem-hoc.de:8083"
+    ol = OllamaUtils(base_url)
+    print(ol.list_models()) 
+    ol.download_model("llama3.1:70b")

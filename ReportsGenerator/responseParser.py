@@ -24,7 +24,16 @@ class ResponseParser:
 
         """
         if response is None:
-            return {}
+            return {"vulnerability": False, "vulnerability_type": "N/A", "vulnerability_name": "N/A"}
+        
+        # Ensure the string starts with a `{` and ends with a `}`
+        response = response.strip()
+        if not response.startswith('{'):
+            response = '{' + response
+        if not response.endswith('}'):
+            response = response + '}'
+        
+        response = response.replace('`', '').replace('json', '')
         
         # Replace any case variations of True/False with lowercase true/false using regex
         response = re.sub(r'\btrue\b', 'true', response, flags=re.IGNORECASE)
@@ -34,7 +43,7 @@ class ResponseParser:
             parsed_data = json.loads(response)
         except json.JSONDecodeError as e:
             print(f"Error parsing response: {response}. Error: {e}")
-            return {}
+            return {"vulnerability": False, "vulnerability_type": "N/A", "vulnerability_name": "N/A"}
         
         # Extract CWE if vulnerability_type is a string
         if 'vulnerability_type' in parsed_data and isinstance(parsed_data['vulnerability_type'], str):
@@ -81,7 +90,7 @@ class ResponseParser:
         df = pd.DataFrame(responses_list)
         df.set_index('Test Name', inplace=True)
 
-        df['predicted_vulnerability'] = df.get('vulnerability', None)
+        df['predicted_vulnerability'] = df.get('vulnerability', False)
         df['predicted_vulnerability_name'] = df.get('vulnerability_name', 'None')
 
         if prompt_type == 'vulnerability_names':
@@ -116,7 +125,7 @@ if __name__ == '__main__':
             'mixtral-8x7b-32768': '{"vulnerability": True, "vulnerability_type": "CWE-22", "vulnerability_name": "Path Traversal"}'
         },
         'BenchmarkTest00002': {
-            'llama3-8b-8192': '{"vulnerability": true, "vulnerability_type": "CWE-22: Improper Limitation of a Path to a Predictable String within a Non-Canonical Path", "vulnerability_name": "Directory Traversal"}',
+            'llama3-8b-8192': '{```json "vulnerability": true, "vulnerability_type": "CWE-701","vulnerability_name": "Cross-Site Scripting (XSS)"```',
             'mixtral-8x7b-32768': '{"vulnerability": true, "vulnerability_type": 22, "vulnerability_name": "Path Traversal"}'
         }
     }

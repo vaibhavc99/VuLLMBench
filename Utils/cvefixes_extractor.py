@@ -2,9 +2,9 @@ import pandas as pd
 import sqlite3
 from sqlite3 import Error
 import os
-import logging
+from configure_logging import configure_logging
 
-logging.basicConfig(level=logging.DEBUG)
+logger = configure_logging("CVEfixesExtraction")
 
 def create_connection(db_file):
     """
@@ -14,10 +14,10 @@ def create_connection(db_file):
     try:
         conn = sqlite3.connect(db_file, timeout=10)
     except Error as e:
-        logging.error(e)
+        logger.error(e)
     return conn
 
-CVEFIXES_PATH = "CodeExamples/CVEfixes_v1.0.7"
+CVEFIXES_PATH = "../CodeExamples/CVEfixes_v1.0.7"
 DATA_PATH = os.path.join(CVEFIXES_PATH, 'Data')
 OUTPUT_PATH = os.path.join(CVEFIXES_PATH, 'Output')
 
@@ -25,10 +25,10 @@ def get_cve_records_by_file(lang, ext):
     """
     Fetch CVE records by file from the database for the given programming language and file extension.
     """
-    logging.info("Reading CVEfixes database")
+    logger.info("Reading CVEfixes database")
     conn = create_connection(os.path.join(DATA_PATH, "CVEfixes.db"))
     
-    logging.info("Running query for records before changes")
+    logger.info("Running query for records before changes")
     query = f"""
     SELECT cv.cve_id, f.filename, f.old_path, f.new_path, f.num_lines_added, f.num_lines_deleted, 
            f.code_before, f.nloc, cc.cwe_id, cw.cwe_name, c.repo_url
@@ -42,7 +42,7 @@ def get_cve_records_by_file(lang, ext):
     """
     cvefixes_records = pd.read_sql_query(query, conn)
     
-    logging.info("Running query for records after changes")
+    logger.info("Running query for records after changes")
     query2 = f"""
     SELECT cv.cve_id, f.filename, f.old_path, f.new_path, f.num_lines_added, f.num_lines_deleted, 
            f.code_after, f.nloc, cc.cwe_id, cw.cwe_name, c.repo_url
@@ -69,20 +69,20 @@ def get_cve_records_by_file(lang, ext):
     # Filter records to include only files with the specified extension
     df = cvefixes_records[cvefixes_records['filename'].str.endswith(ext)]
     
-    logging.info("Saving to CSV")
+    logger.info("Saving to CSV")
     df.to_csv(os.path.join(OUTPUT_PATH, f'cvefixes_{lang.lower()}.csv'), index=False)
     
-    logging.info(df.head(5))
-    logging.info(f"Total records: {len(df)}")
+    logger.info(df.head(5))
+    logger.info(f"Total records: {len(df)}")
 
 def get_cve_records_by_method(lang, ext):
     """
     Fetch CVE records by method from the database for the given programming language and file extension.
     """
-    logging.info("Reading CVEfixes database")
+    logger.info("Reading CVEfixes database")
     conn = create_connection(os.path.join(DATA_PATH, "CVEFixes.db"))
     
-    logging.info("Running query for method-level records")
+    logger.info("Running query for method-level records")
     query = f"""
     SELECT cv.cve_id, f.filename, f.old_path, f.new_path, mc.name, mc.code, mc.nloc, mc.before_change, 
            cc.cwe_id, cw.cwe_name, c.repo_url
@@ -103,12 +103,28 @@ def get_cve_records_by_method(lang, ext):
     # Filter records to include only files with the specified extension
     df = cve_records[cve_records['filename'].str.endswith(ext)]
     
-    logging.info("Saving to CSV")
+    logger.info("Saving to CSV")
     df.to_csv(os.path.join(OUTPUT_PATH, f'cvefixes_{lang.lower()}_method.csv'), index=False)
     
-    logging.info(df.head(5))
-    logging.info(f"Total records: {len(df)}")
+    logger.info(df.head(5))
+    logger.info(f"Total records: {len(df)}")
 
 if __name__ == '__main__':
     get_cve_records_by_file("Java", ".java")
     get_cve_records_by_method("Java", ".java")
+    
+    get_cve_records_by_file("C", ".c")
+    get_cve_records_by_method("C", ".c")
+
+    get_cve_records_by_file("C++", ".cpp")
+    get_cve_records_by_method("C++", ".cpp")
+
+    get_cve_records_by_file("C#", ".cs")
+    get_cve_records_by_method("C#", ".cs")
+
+    get_cve_records_by_file("Python", ".py")
+    get_cve_records_by_method("Python", ".py")
+
+    languages = ["Java", "C", "C#", "C++" "Python", "JavaScript", "Go", "HTML", "CSS", "Batchfile", "CoffeeScript", "Erlang"
+                "Haskell", "Lua", "Matlab", "Objective-C", "Perl", "PHP", "R", "Ruby", "Rust", "SQL", 
+                "Scala", "Shell", "TeX", "TypeScript"]

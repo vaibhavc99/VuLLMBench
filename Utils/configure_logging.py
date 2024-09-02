@@ -11,8 +11,8 @@ def configure_logging(logger_name, log_file=None, config=None):
     if log_file and not LOGGING_FILE:
         LOGGING_FILE = log_file
 
-    # if not LOGGING_FILE:
-    #     LOGGING_FILE = "vullmbench.log"
+    if not LOGGING_FILE:
+        LOGGING_FILE = "vullmbench.log"
 
     logging_options = {
         'debug': logging.DEBUG,

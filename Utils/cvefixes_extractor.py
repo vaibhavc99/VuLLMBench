@@ -4,7 +4,7 @@ from sqlite3 import Error
 import os
 from configure_logging import configure_logging
 
-logger = configure_logging("CVEfixesExtraction")
+logger = configure_logging("CVEfixesExtraction", "../vullmbench.log")
 
 def create_connection(db_file):
     """
@@ -110,21 +110,13 @@ def get_cve_records_by_method(lang, ext):
     logger.info(f"Total records: {len(df)}")
 
 if __name__ == '__main__':
-    get_cve_records_by_file("Java", ".java")
-    get_cve_records_by_method("Java", ".java")
-    
-    get_cve_records_by_file("C", ".c")
-    get_cve_records_by_method("C", ".c")
-
-    get_cve_records_by_file("C++", ".cpp")
-    get_cve_records_by_method("C++", ".cpp")
-
-    get_cve_records_by_file("C#", ".cs")
-    get_cve_records_by_method("C#", ".cs")
-
-    get_cve_records_by_file("Python", ".py")
-    get_cve_records_by_method("Python", ".py")
-
-    languages = ["Java", "C", "C#", "C++" "Python", "JavaScript", "Go", "HTML", "CSS", "Batchfile", "CoffeeScript", "Erlang"
-                "Haskell", "Lua", "Matlab", "Objective-C", "Perl", "PHP", "R", "Ruby", "Rust", "SQL", 
+    languages = ["Java", "C", "C++", "C#", "Python", "JavaScript", "Go", "HTML", "CSS", "Batchfile", "CoffeeScript", "Erlang",
+                "Haskell", "Lua", "Matlab", "Objective-C", "Perl", "PHP", "R", "Ruby", "Rust", "SQL",
                 "Scala", "Shell", "TeX", "TypeScript"]
+
+    extensions = [".java", ".c", ".cpp", ".cs", ".py", ".js", ".go", ".html", ".css", ".bat", ".coffee", ".erl",
+                  ".hs", ".lua", ".m", ".m", ".pl", ".php", ".r", ".rb", ".rs", ".sql", ".scala", ".sh", ".tex", ".ts"]
+
+    for lang, ext in zip(languages, extensions):
+        get_cve_records_by_file(lang, ext)
+        get_cve_records_by_method(lang, ext)

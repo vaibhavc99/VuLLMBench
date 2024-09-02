@@ -7,7 +7,6 @@ from LLMsInterface.llms import LLMs
 from LLMsInterface.responseDB import LLMResponseDB
 from ReportsGenerator.responseParser import ResponseParser
 from ReportsGenerator.vulnEvaluator import VulnerabilityEvaluator
-import pandas as pd
 from Utils.configure_logging import configure_logging
 import json
 import os
@@ -180,9 +179,9 @@ class Controller:
             self.db.insert_response(table_name, index, prompt, model_name, response)
             
             if reflection:
-                self.logger.info(f"A self-reflection response by {model_name} for {index} is stored in database.")
+                self.logger.info(f"A self-reflection response by {model_name} for {index} with '{prompt_type}' prompt is stored in database.")
             else:
-                self.logger.info(f"A response by {model_name} for {index} is stored in database.")
+                self.logger.info(f"A response by {model_name} for {index} with '{prompt_type}' prompt is stored in the database.")
 
     def generate_reports(self, prompt_type: str, experiment: str = None):
         """
@@ -193,7 +192,7 @@ class Controller:
         - experiment (str, optional): The name of the experiment.
 
         """
-        self.logger.info(f"Generating reports for Experiment-{experiment} based on LLM responses.")
+        self.logger.info(f"Generating reports for Experiment-{experiment} based on LLM responses for '{prompt_type}' prompt.")
 
         # Standard evaluation
         self.evaluate_and_save_results(prompt_type, experiment)
@@ -225,7 +224,6 @@ class Controller:
 
         evaluator = VulnerabilityEvaluator(df, self.examples)
         results = evaluator.evaluate_by_model(experiment, self.dataset_name, prompt_type)
-        # print(f"\nEvaluation Results: \n{results}")
 
         results_json = json.dumps(results, indent=4)
         with open(f'./Evaluation/{experiment}/{self.dataset_name}-{prompt_type}.json', 'w') as file:

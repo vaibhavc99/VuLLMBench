@@ -14,7 +14,7 @@ class OllamaUtils:
     """
     def __init__(self, base_url):
         self.client = ollama.Client(base_url)
-        self.logger = configure_logging("OllamaUtils")
+        self.logger = configure_logging("OllamaUtils", "LLMsInterface/ollama.log")
 
     def is_running(self):
         """
@@ -106,7 +106,9 @@ class OllamaUtils:
             self.logger.info(f"Model {model_name} is not running")
     
 if __name__ == '__main__':  
-    base_url = "http://hoc-lx-gpu02.ad.iem-hoc.de:8083"
+    base_url = "https://hoc-lx-gpu02.ad.iem-hoc.de:8083"
     ol = OllamaUtils(base_url)
-    print(ol.list_models()) 
-    ol.download_model("llama3.1:70b")
+    print(ol.list_models())
+    # ol.model_available("llama3.1") 
+    # ol.download_model("qwen2:72b")
+    # ol.remove_model("deepseek-coder-v2:16b-lite-instruct-q4_0")

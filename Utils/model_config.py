@@ -1,14 +1,12 @@
-DATA_DIR_PATH = "./CodeExamples"
+DATA_DIR_PATH = "CodeExamples"
 
-MODELS_DIR_PATH = ""
-
-DB_PATH = "./llms_responses.db"
+DB_PATH = "LLMsInterface/responses/llms_responses.db"
 
 OPENAI_API_KEY = ""
 
-OLLAMA_HOST = "http://hoc-lx-gpu02.ad.iem-hoc.de:8083"
+OLLAMA_HOST = "https://hoc-lx-gpu02.ad.iem-hoc.de:8083"
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = ""
 
 OPENAI_MODEL_LIST = [
     "gpt-3.5-turbo",
@@ -17,12 +15,22 @@ OPENAI_MODEL_LIST = [
 
 OLLAMA_MODEL_LIST = [
     "llama3.1:70b",
+    "llama3.1:8b-instruct-q4_0",
     "llama3",
     "llama2",
-    "codellama",
-    "gemma",
-    "mistral",
-    "phi"
+    "gemma2:27b",
+    "gemma2:9b",
+    "gemma2:2b",
+    "mistral-nemo:12b",
+    "mistral-large:123b",
+    "mixtral:8x7b",
+    "mixtral:8x22b",
+    "qwen2:72b",
+    "qwen2:24b",
+    "phi3:14b",
+    "codellama:7b-instruct-q4_0",
+    "deepseek-coder-v2:16b-lite-instruct-q4_0",
+    "codegemma:7b-instruct-q4_0"
 ]
 
 GROQ_MODEL_LIST = [
@@ -33,7 +41,11 @@ GROQ_MODEL_LIST = [
 ]
 
 HOC_MODEL_LIST = [
-    "psyche/Meta-Llama-3-70B-Instruct-awq"
+    "psyche/Meta-Llama-3-70B-Instruct-awq",
+    "hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4"
 ]
 
-MODEL_PARAMETERS = {"temperature": 0.1}
+MODEL_PARAMETERS = {
+                        "temperature": 0,
+                        "max_tokens": 50
+                    }

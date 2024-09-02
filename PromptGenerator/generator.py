@@ -13,10 +13,9 @@ class PromptGenerator:
         self.prompt_types = {
             "simple": (prompt_templates.SIMPLE_SYSTEM_PROMPT, prompt_templates.SIMPLE_USER_PROMPT),
             "vulnerability_specific": (prompt_templates.VUL_SYSTEM_PROMPT, prompt_templates.VUL_USER_PROMPT),
-            "vulnerability_names": (prompt_templates.VUL_NAME_SYSTEM_PROMPT, prompt_templates.VUL_NAME_USER_PROMPT),
-            "explanatory_insights": (prompt_templates.EXPL_SYSTEM_PROMPT, prompt_templates.EXPL_USER_PROMPT),
-            "solution_oriented": (prompt_templates.SOL_SYSTEM_PROMPT, prompt_templates.SIMPLE_USER_PROMPT),
-            "test": (prompt_templates.TEST_SYSTEM_PROMPT, prompt_templates.TEST_USER_PROMPT),
+            "holistic_vulnerability_analysis": (prompt_templates.HOLISTIC_VULNERABILITY_ANALYSIS_SYSTEM_PROMPT, prompt_templates.HOLISTIC_VULNERABILITY_ANALYSIS_USER_PROMPT),
+            "few_shot": (prompt_templates.FEW_SHOT_SYSTEM_PROMPT, prompt_templates.FEW_SHOT_USER_PROMPT),
+            "chain_of_thought": (prompt_templates.CHAIN_OF_THOUGHT_SYSTEM_PROMPT, prompt_templates.CHAIN_OF_THOUGHT_USER_PROMPT),
             "self_reflection": prompt_templates.SELF_REFLECTION_PROMPT,
             "self_reflection_with_ground_truth": prompt_templates.SELF_REFLECTION_WITH_GROUND_TRUTH_PROMPT
         }

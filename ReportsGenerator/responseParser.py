@@ -23,32 +23,48 @@ class ResponseParser:
         - dict: A dictionary containing the parsed key-value pairs.
 
         """
-        if response is None:
-            return {"vulnerability": False, "vulnerability_type": "N/A", "vulnerability_name": "N/A"}
-        
-        # Ensure the string starts with a `{` and ends with a `}`
-        response = response.strip()
-        if not response.startswith('{'):
-            response = '{' + response
-        if not response.endswith('}'):
-            response = response + '}'
-        
-        response = response.replace('`', '').replace('json', '')
-        
+        default_response = {"vulnerability": False, "vulnerability_type": "N/A", "vulnerability_name": "N/A"}
+
+        if not response:
+            return default_response
+
+        # Clean up the response
+        response = response.strip()   
+        response = re.sub(r'[()]', '', response)
+
+        # Check if the response is in the format of a JSON code block
+        json_code_block_match = re.match(r'^```json\s*(\{.*?\})\s*```$', response, re.DOTALL)
+
+        if json_code_block_match:
+            json_response = json_code_block_match.group(1)
+        else:
+            # Look for JSON object within the response
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+
+            if json_start == -1 or json_end == -1:
+                return default_response
+
+            json_response = response[json_start:json_end].strip()
+
         # Replace any case variations of True/False with lowercase true/false using regex
-        response = re.sub(r'\btrue\b', 'true', response, flags=re.IGNORECASE)
-        response = re.sub(r'\bfalse\b', 'false', response, flags=re.IGNORECASE)
-        
+        json_response = re.sub(r'\btrue\b', 'true', json_response, flags=re.IGNORECASE)
+        json_response = re.sub(r'\bfalse\b', 'false', json_response, flags=re.IGNORECASE)
+
         try:
-            parsed_data = json.loads(response)
+            parsed_data = json.loads(json_response)
         except json.JSONDecodeError as e:
-            print(f"Error parsing response: {response}. Error: {e}")
-            return {"vulnerability": False, "vulnerability_type": "N/A", "vulnerability_name": "N/A"}
-        
+            print(f"Error parsing response: {json_response}. Error: {e}")
+            return default_response
+
+        # Validate the required keys
+        if not all(key in parsed_data for key in ['vulnerability', 'vulnerability_type', 'vulnerability_name']):
+            return default_response
+
         # Extract CWE if vulnerability_type is a string
         if 'vulnerability_type' in parsed_data and isinstance(parsed_data['vulnerability_type'], str):
             parsed_data['vulnerability_type'] = self.extract_cwe(parsed_data['vulnerability_type'])
-        
+
         return parsed_data
 
     def extract_cwe(self, cwe_string):
@@ -98,9 +114,8 @@ class ResponseParser:
         else:
             df['predicted_cwe'] = df.get('vulnerability_type', 'None')
 
-        if prompt_type == 'explanatory_insights':
-            df['explanation'] = df.get('explanation', 'None')
-        if prompt_type == 'solution_oriented':            
+        if prompt_type == 'holistic_vulnerability_analysis':
+            df['explanation'] = df.get('explanation', 'None')          
             df['solution'] = df.get('solution', 'None')
 
         df.drop(columns=['vulnerability', 'vulnerability_type', 'vulnerability_name'], inplace=True, errors='ignore')

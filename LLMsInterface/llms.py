@@ -30,7 +30,12 @@ class LLMs:
         - model: The model object if found, otherwise None.
         """
         if model_name in self.config.OPENAI_MODEL_LIST:
-            model = ChatOpenAI(api_key=self.config.OPENAI_API_KEY, model=model_name, temperature=0)
+            model = ChatOpenAI(
+                api_key=self.config.OPENAI_API_KEY,
+                model=model_name,
+                temperature=self.config.MODEL_PARAMETERS["temperature"],
+                max_tokens=self.config.MODEL_PARAMETERS["max_tokens"]
+            )
 
         elif model_name in self.config.OLLAMA_MODEL_LIST:
             if model_name not in self.ollama_checked:
@@ -38,17 +43,29 @@ class LLMs:
                 host = OllamaUtils(self.config.OLLAMA_HOST)
                 if not host.model_available(model_name):
                     return None
-            model = ChatOllama(base_url=self.config.OLLAMA_HOST, model=model_name, temperature=0)
+            
+            model = ChatOllama(
+                base_url=self.config.OLLAMA_HOST,
+                model=model_name,
+                temperature=self.config.MODEL_PARAMETERS["temperature"],
+                num_predict=self.config.MODEL_PARAMETERS["max_tokens"],
+            )
 
         elif model_name in self.config.GROQ_MODEL_LIST:
-            model = ChatGroq(groq_api_key=self.config.GROQ_API_KEY, model=model_name, temperature=0)
+            model = ChatGroq(
+                groq_api_key=self.config.GROQ_API_KEY,
+                model=model_name,
+                temperature=self.config.MODEL_PARAMETERS["temperature"],
+                max_tokens=self.config.MODEL_PARAMETERS["max_tokens"]
+            )
 
         elif model_name in self.config.HOC_MODEL_LIST:
             model = ChatOpenAI(
                 openai_api_key="EMPTY", 
-                openai_api_base="http://hoc-lx-gpu02.ad.iem-hoc.de:8080/v1",
+                openai_api_base="https://hoc-lx-gpu02.ad.iem-hoc.de:8080/v1",
                 model=model_name,
-                temperature=0
+                temperature=self.config.MODEL_PARAMETERS["temperature"],
+                max_tokens=self.config.MODEL_PARAMETERS["max_tokens"]
             )
 
         else:
@@ -160,20 +177,24 @@ class LLMs:
         - dict: A dictionary with the responses from the models.
         """
         responses = {}
-        for model_name, prompts in sequential_prompt_models.items():
-            start_time = time.time()
-            model = self.get_model(model_name)
-            if model is None:
-                self.logger.error(f"Model {model_name} could not be retrieved.")
-                continue
+        try:
+            for model_name, prompts in sequential_prompt_models.items():
+                start_time = time.time()
+                model = self.get_model(model_name)
+                if model is None:
+                    self.logger.error(f"Model {model_name} could not be retrieved.")
+                    continue
 
-            for index, prompt in prompts:
-                response = self.get_response(prompt, model)
-                responses[(index, model_name)] = response
-                self.logger.info(f"Got response from {model_name} at index {index}")
+                for index, prompt in prompts:
+                    response = self.get_response(prompt, model)
+                    responses[(index, model_name)] = response
+                    self.logger.info(f"Got response from {model_name} at index {index}")
 
-            elapsed_time = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
-            self.logger.info(f"Model {model_name} executed {len(prompts)} prompts in {elapsed_time}")
+                elapsed_time = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+                self.logger.info(f"Model {model_name} executed {len(prompts)} prompts in {elapsed_time}")
+
+        except (KeyboardInterrupt, SystemExit):
+            self.logger.warning("Program interrupted during sequential processing. Returning collected responses so far.")
 
         return responses
 
@@ -181,8 +202,8 @@ if __name__ == '__main__':
     import Utils.model_config as model_config
     llms = LLMs(model_config)
     prompts_per_model = {
-        "psyche/Meta-Llama-3-70B-Instruct-awq": [(0, "Translate the sentence to German: 'I love programming'.")],
-        "llama3.1:70b": [(0, "Translate the sentence to German: 'I love programming'."),
+        "hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4": [(0, "Translate the sentence to German: 'I love programming'.")],
+        "llama3.1:8b-instruct-q4_0": [(0, "Translate the sentence to German: 'I love programming'."),
                          (1, "Translate the sentence to Spanish: 'I am a software engineer'.")]
     }
 

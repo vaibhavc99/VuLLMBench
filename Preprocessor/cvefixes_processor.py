@@ -42,7 +42,7 @@ class CVEFixesProcessor:
             return code
 
         # Regular expressions for different languages
-        if self.language in {'java', 'c', 'cpp', 'js'}:
+        if self.language in {'java', 'c', 'c++', 'javascript', 'c#'}:
             multiline_pattern = re.compile(r'/\*.*?\*/', re.DOTALL)  # Matches multiline comments
             singleline_pattern = re.compile(r'//.*?(?=\n|$)')  # Matches single-line comments
         elif self.language == 'python':
@@ -60,6 +60,7 @@ class CVEFixesProcessor:
     def load_and_process_examples(self, processing_options=None):
         """
         Loads and processes the CVE fixes examples based on the provided processing options.
+        Uses cached processed files if available.
 
         Parameters:
         - processing_options (dict, optional): Options for processing the examples. Should contain keys:
@@ -72,6 +73,12 @@ class CVEFixesProcessor:
         """
         if processing_options is None:
             processing_options = {'top_25_cwe': True, 'file_examples': True, 'method_examples': False}
+
+        examples_type = 'file' if processing_options.get('file_examples', False) else 'method'
+        processed_csv_path = os.path.join(self.cvefixes_dir, f'processed_cvefixes_{examples_type}_{self.language}.csv')
+
+        if os.path.exists(processed_csv_path):
+            return pd.read_csv(processed_csv_path)
 
         if processing_options.get('file_examples', False):
             csv_path = self.examples_csv_path
@@ -112,6 +119,8 @@ class CVEFixesProcessor:
         cvefixes_df.index = cvefixes_df.index.map(lambda x: f"Test{x}")     # Prepend "Test" to the index
         cvefixes_df.index.name = 'test_name'
 
+        self.save_processed_examples(cvefixes_df, examples_type)
+
         return cvefixes_df[['cwe', 'cwe_name', 'real_vulnerability', 'cve_id', 'code_snippet']]
 
     def save_processed_examples(self, processed_df: pd.DataFrame, examples_type):
@@ -123,19 +132,17 @@ class CVEFixesProcessor:
         - examples_type (str): Type of examples processed ('file' or 'method').
         """
         processed_csv_path = os.path.join(self.cvefixes_dir, f'processed_cvefixes_{examples_type}_{self.language}.csv')
-        processed_df.to_csv(processed_csv_path)
+        processed_df.to_csv(processed_csv_path, index=False)
 
 if __name__ == "__main__":
     cvefixes_dir = 'CodeExamples/CVEfixes_v1.0.7'
-    language = 'java'
+    language = 'javascript'
     processing_options = {
-        'top_25_cwe': True,
-        'file_examples': True,
-        'method_examples': False
+        'top_25_cwe': False,
+        'file_examples': False,
+        'method_examples': True
     }
 
     cve_processor = CVEFixesProcessor(cvefixes_dir, language=language)
     processed_df = cve_processor.load_and_process_examples(processing_options=processing_options)
-    examples_type = 'file' if processing_options.get('file_examples', False) else 'method'
-    cve_processor.save_processed_examples(processed_df, examples_type)
     print(processed_df.head())

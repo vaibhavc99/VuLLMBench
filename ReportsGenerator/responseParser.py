@@ -31,6 +31,7 @@ class ResponseParser:
         # Clean up the response
         response = response.strip()   
         response = re.sub(r'[()]', '', response)
+        response = re.sub(r'\\', '', response)
 
         # Check if the response is in the format of a JSON code block
         json_code_block_match = re.match(r'^```json\s*(\{.*?\})\s*```$', response, re.DOTALL)
@@ -38,28 +39,58 @@ class ResponseParser:
         if json_code_block_match:
             json_response = json_code_block_match.group(1)
         else:
-            # Look for JSON object within the response
-            json_start = response.find('{')
-            json_end = response.rfind('}') + 1
+            # Use regex to find the keys and values
+            vulnerability_match = re.search(r'"vulnerability":\s*(true|false)', response, re.IGNORECASE)
+            vulnerability_type_match = re.search(r'"vulnerability_type":\s*"([^"]+)"', response)
+            vulnerability_name_match = re.search(r'"vulnerability_name":\s*"([^"]+)"', response)
 
-            if json_start == -1 or json_end == -1:
+            # Default values for the missing keys
+            vulnerability = default_response["vulnerability"]
+            vulnerability_type = default_response["vulnerability_type"]
+            vulnerability_name = default_response["vulnerability_name"]
+
+            # Check for the presence of yes/no or related terms indicating a vulnerability
+            if vulnerability_match:
+                vulnerability = vulnerability_match.group(1).lower() == 'true'
+            else:
+                # Check for yes/no variations
+                if re.search(r'\b(yes)\b', response, re.IGNORECASE):
+                    vulnerability = True
+                elif re.search(r'\b(no)\b', response, re.IGNORECASE):
+                    vulnerability = False
+                # Check if "contains" and "vulnerability" are present anywhere in the response
+                elif re.search(r'\bcontains\b', response, re.IGNORECASE) and re.search(r'\bvulnerabilities?|vulnerability\b', response, re.IGNORECASE):
+                    vulnerability = True
+
+            # Check for CWE pattern if vulnerability_type is missing
+            if vulnerability_type_match:
+                vulnerability_type = vulnerability_type_match.group(1)
+            else:
+                cwe_match = re.search(r'CWE-(\d+)', response)
+                if cwe_match:
+                    vulnerability_type = f"CWE-{cwe_match.group(1)}"
+
+            # Check for vulnerability name, keep the default if not found
+            if vulnerability_name_match:
+                vulnerability_name = vulnerability_name_match.group(1)
+
+            json_response = {
+                "vulnerability": vulnerability,
+                "vulnerability_type": vulnerability_type,
+                "vulnerability_name": vulnerability_name
+            }
+
+        if isinstance(json_response, str):
+            json_response = re.sub(r'\btrue\b', 'true', json_response, flags=re.IGNORECASE)
+            json_response = re.sub(r'\bfalse\b', 'false', json_response, flags=re.IGNORECASE)
+
+            try:
+                parsed_data = json.loads(json_response)
+            except json.JSONDecodeError as e:
+                print(f"Error parsing response: {json_response}. Error: {e}")
                 return default_response
-
-            json_response = response[json_start:json_end].strip()
-
-        # Replace any case variations of True/False with lowercase true/false using regex
-        json_response = re.sub(r'\btrue\b', 'true', json_response, flags=re.IGNORECASE)
-        json_response = re.sub(r'\bfalse\b', 'false', json_response, flags=re.IGNORECASE)
-
-        try:
-            parsed_data = json.loads(json_response)
-        except json.JSONDecodeError as e:
-            print(f"Error parsing response: {json_response}. Error: {e}")
-            return default_response
-
-        # Validate the required keys
-        if not all(key in parsed_data for key in ['vulnerability', 'vulnerability_type', 'vulnerability_name']):
-            return default_response
+        else:
+            parsed_data = json_response
 
         # Extract CWE if vulnerability_type is a string
         if 'vulnerability_type' in parsed_data and isinstance(parsed_data['vulnerability_type'], str):
@@ -142,6 +173,13 @@ if __name__ == '__main__':
         'BenchmarkTest00002': {
             'llama3-8b-8192': '{```json "vulnerability": true, "vulnerability_type": "CWE-701","vulnerability_name": "Cross-Site Scripting (XSS)"```',
             'mixtral-8x7b-32768': '{"vulnerability": true, "vulnerability_type": 22, "vulnerability_name": "Path Traversal"}'
+        },
+        'BenchmarkTest00003': {
+            'llama3-8b-8192': """{
+                                "vulnerability": true,
+                                "vulnerability_type": "CWE-78",
+                                "vulnerability_name": "Improper Neutralization of Special Elements
+                            """
         }
     }
 

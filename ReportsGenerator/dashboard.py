@@ -6,20 +6,22 @@ import plotly.express as px
 import plotly.figure_factory as ff
 import psutil
 
-class StreamlitHandler:
+class DashboardManager:
     def __init__(self, data_files):
-        self.data_files = data_files
         self.data = self.load_and_aggregate_data(data_files)
-        self.model_list = set(model for model, _ in self.data.keys())
+        self.model_list = {model for model, _ in self.data.keys()}
         self.cwe_list = self.get_cwe_list()
 
     def get_cwe_list(self):
         cwe_set = set()
         for model_data in self.data.values():
-            if "Vulnerability Type Metrics" in model_data:
-                cwe_keys = model_data["Vulnerability Type Metrics"]["Using Predicted CWE"]["Per Class Metrics"]["Accuracy"].keys()
-                cwe_set.update(cwe_keys)
-        return list(cwe_set)
+            vulnerability_metrics = model_data.get("Vulnerability Type Metrics", {})
+            predicted_cwe_metrics = vulnerability_metrics.get("Using Predicted CWE", {})
+            per_class_metrics = predicted_cwe_metrics.get("Per Class Metrics", {})
+            accuracy_metrics = per_class_metrics.get("Accuracy", {})
+            cwe_set.update(accuracy_metrics.keys())
+        sorted_cwe_list = sorted(list(cwe_set), key=lambda cwe: int(cwe.split('-')[1]))
+        return sorted_cwe_list
 
     @staticmethod
     def load_data(file):
@@ -32,12 +34,10 @@ class StreamlitHandler:
             data = self.load_data(file)
             for model, model_results in data.items():
                 id = (model, model_results.get("Prompt Type"))
-                if id not in aggregated_data:
-                    aggregated_data[id] = model_results
-                else:
-                    # Merge or update existing entries if necessary
+                if id in aggregated_data:
                     aggregated_data[id].update(model_results)
-
+                else:
+                    aggregated_data[id] = model_results
         return aggregated_data
 
     def render_sidebar(self):
@@ -45,11 +45,13 @@ class StreamlitHandler:
         selected_model = st.sidebar.selectbox("Choose a model", sorted(self.model_list))
 
         st.sidebar.title("Classification Type")
-        classification_type = st.sidebar.radio("Choose Classification Type", ("Binary Classification", "Multiclass Classification"))
-
+        classification_type = st.sidebar.radio("Choose Classification Type", 
+                                               ("Binary Classification", "Multiclass Classification"))
+        
         selected_cwe = None
         if classification_type == "Multiclass Classification" and self.cwe_list:
-            selected_cwe = st.sidebar.selectbox("Choose a CWE Category (default - 'Aggregated Metrics'", ["Aggregated Metrics"] + sorted(self.cwe_list))
+            selected_cwe = st.sidebar.selectbox("Choose a CWE Category", 
+                                                ["Aggregated Metrics"] + self.cwe_list)
 
         return selected_model, classification_type, selected_cwe
 
@@ -57,229 +59,216 @@ class StreamlitHandler:
         st.set_page_config(
             page_title="VuLLMBench Dashboard",
             page_icon="📊",
+            layout="wide",
             initial_sidebar_state="expanded",
         )
+        st.markdown("<h1 style='text-align: center;'>VuLLMBench Dashboard</h1>", unsafe_allow_html=True)
 
         selected_model, classification_type, selected_cwe = self.render_sidebar()
 
-        st.title("VuLLMBench Dashboard")
-
         model_data = {key: value for key, value in self.data.items() if key[0] == selected_model}
-
-        # Depending on the classification type, create the appropriate plots
-        graph_creator = GraphCreator(model_data, self.cwe_list)
+        metrics_visualizer = Visualizer(model_data, self.cwe_list)
 
         if classification_type == "Binary Classification":
-            st.header("Binary Classification Metrics")
-            figures = graph_creator.create_binary_classification_plots()
-            
-            for metric, fig in figures.items():
-                st.subheader(f"{metric}")
-                st.plotly_chart(fig)
+            st.markdown("<h2 style='text-align: center;'>Vulnerability Classification Metrics</h2>", unsafe_allow_html=True)
+            st.markdown("<br><br>", unsafe_allow_html=True)
 
-        elif classification_type == "Multiclass Classification" and selected_cwe:
-            st.header("Multiclass Classification Metrics")
-            if selected_cwe == "Aggregated Metrics":
-                fig, confusion_matrix_figs = graph_creator.create_aggregated_multiclass_classification_plot()
-                st.plotly_chart(fig)
-                if confusion_matrix_figs:
-                    for cm_fig in confusion_matrix_figs:
-                        st.plotly_chart(cm_fig)
-            else:
-                fig = graph_creator.create_multiclass_classification_plot(selected_cwe)
-                st.plotly_chart(fig)
-        elif classification_type == "Multiclass Classification" and not self.cwe_list:
-            st.error("No 'Vulnerability Type Metrics' found in the data.")
+            col1, col2 = st.columns(2)
+            self.render_binary_classification(metrics_visualizer, col1, col2)
 
+        elif classification_type == "Multiclass Classification":
+            st.markdown("<h2 style='text-align: center;'>Vulnerability Type Classification Metrics</h2>", unsafe_allow_html=True)
+            st.markdown("<br><br>", unsafe_allow_html=True)
+
+            self.render_multiclass_classification(metrics_visualizer, selected_cwe)
+
+        # Exit button at the sidebar
+        st.sidebar.markdown(14*"<br>", unsafe_allow_html=True)
         exit_app = st.sidebar.button("Shut Down")
         if exit_app:
             pid = os.getpid()
             p = psutil.Process(pid)
             p.terminate()
 
+    def render_binary_classification(self, metrics_visualizer, col1, col2):
+        display_option = st.sidebar.selectbox("Choose a Display Option", 
+                                                ["Individual Metrics"] + ["Aggregated Metrics"])
 
-class GraphCreator:
+        if display_option == "Aggregated Metrics":
+            fig = metrics_visualizer.create_aggregated_binary_classification_plot()
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            figures = metrics_visualizer.create_binary_classification_plots()
+            metrics_list = list(figures.keys())
+
+            for i, metric in enumerate(metrics_list):
+                if i % 2 == 0:
+                    with col1:
+                        st.subheader(metric)
+                        st.plotly_chart(figures[metric])
+                else:
+                    with col2:
+                        st.subheader(metric)
+                        st.plotly_chart(figures[metric])
+
+    def render_multiclass_classification(self, metrics_visualizer, selected_cwe):
+        if selected_cwe == "Aggregated Metrics":
+            self.render_aggregated_multiclass(metrics_visualizer)
+        else:
+            fig = metrics_visualizer.create_multiclass_classification_plot(selected_cwe)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+
+    def render_aggregated_multiclass(self, metrics_visualizer):
+        fig, confusion_matrix_figs = metrics_visualizer.create_aggregated_multiclass_classification_plot()
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
+        
+        if confusion_matrix_figs:
+            col1, col2 = st.columns(2)
+            for i, cm_fig in enumerate(confusion_matrix_figs):
+                if i % 2 == 0:
+                    with col1:
+                        st.plotly_chart(cm_fig)
+                else:
+                    with col2:
+                        st.plotly_chart(cm_fig)
+
+class Visualizer:
     def __init__(self, model_data, cwe_list):
         self.model_data = model_data
         self.cwe_list = cwe_list
 
-    def create_grouped_bar_plot(self, metric_name):
-        # Prepare data for plotting
-        data = []
-
-        for (model, prompt_type), metrics in self.model_data.items():
-            if "Vulnerability Metrics" in metrics:
-                data.append({
-                    "Prompt Type": prompt_type,
-                    "Dataset": metrics.get("Dataset", "Unknown"),
-                    "Value": metrics["Vulnerability Metrics"].get(metric_name, 0)
-                })
-
-        if not data:
-            st.warning(f"No data available for the metric '{metric_name}'.")
-            return None
-
-        df = pd.DataFrame(data)
-
-        # Plot grouped bar chart using Plotly
-        fig = px.bar(
-            df,
-            x="Dataset",
-            y="Value",
-            color="Prompt Type",
-            barmode="group",
-            title=f"{metric_name} by Dataset and Prompt Type",
-            labels={"Value": metric_name, "Dataset": "Dataset", "Prompt Type": "Prompt Type"},
-            height=400
+    def create_grouped_bar_plot(self, data, x, y, color, title, barmode='group', facet_row=None, height=400):
+        return px.bar(
+            data,
+            x=x,
+            y=y,
+            color=color,
+            barmode=barmode,
+            facet_row=facet_row,
+            title=title,
+            height=height
         )
-        return fig
 
     def create_binary_classification_plots(self):
-        # Create plots for each metric
-        metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+        metrics = ["F1-Score", "Precision", "Recall", "Accuracy"]
         figures = {}
         for metric in metrics:
-            fig = self.create_grouped_bar_plot(metric)
-            if fig:
-                figures[metric] = fig
+            data = self.prepare_metric_data(metric, "Vulnerability Metrics")
+            if not data.empty:
+                figures[metric] = self.create_grouped_bar_plot(
+                    data, "Dataset", "Value", "Prompt Type", f"{metric} by Dataset and Prompt Type"
+                )
         return figures
+    
+    def create_aggregated_binary_classification_plot(self):
+        metrics = ["F1-Score", "Precision", "Recall"]
+        data = []
+
+        for metric in metrics:
+            metric_data = self.prepare_metric_data(metric, "Vulnerability Metrics")
+            if not metric_data.empty:
+                metric_data["Metric"] = metric
+                data.append(metric_data)
+
+        if data:
+            combined_data = pd.concat(data)
+            fig = self.create_grouped_bar_plot(
+                combined_data, "Metric", "Value", "Prompt Type", 
+                "Aggregated Binary Classification Metrics", barmode='group', facet_row="Dataset", height=600
+            )
+            return fig
+        else:
+            st.warning("No data available for binary classification metrics.")
+            return None
+
+
+    def prepare_metric_data(self, metric_name, metrics_key):
+        data = []
+        for (_, prompt_type), metrics in self.model_data.items():
+            dataset = metrics.get("Dataset", "Unknown")
+            value = metrics.get(metrics_key, {}).get(metric_name, 0)
+            data.append({"Prompt Type": prompt_type, "Dataset": dataset, "Value": value})
+        return pd.DataFrame(data) if data else pd.DataFrame()
 
     def create_aggregated_multiclass_classification_plot(self):
-        # Extract aggregated metrics from the data
-        aggregated_metrics = []
-        confusion_matrix_dict = {}
+        metrics_to_extract = ["Macro Precision", "Macro Recall", "Macro F1-Score", 
+                              "Weighted Precision", "Weighted Recall", "Weighted F1-Score"] 
+                            #   "MCC", "Cohen Kappa"]
+        aggregated_metrics, confusion_matrices = self.extract_aggregated_metrics(metrics_to_extract)
 
-        for (model, prompt_type), metrics in self.model_data.items():
-            if "Vulnerability Type Metrics" in metrics:
-                vulnerability_metrics = metrics["Vulnerability Type Metrics"]["Using Predicted CWE"]
-                aggregated_metrics.append({
-                    "Metric": "Macro Precision",
-                    "Value": vulnerability_metrics.get("Macro Precision", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Macro Recall",
-                    "Value": vulnerability_metrics.get("Macro Recall", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Macro F1-Score",
-                    "Value": vulnerability_metrics.get("Macro F1-Score", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Weighted Precision",
-                    "Value": vulnerability_metrics.get("Weighted Precision", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Weighted Recall",
-                    "Value": vulnerability_metrics.get("Weighted Recall", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Weighted F1-Score",
-                    "Value": vulnerability_metrics.get("Weighted F1-Score", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "MCC",
-                    "Value": vulnerability_metrics.get("MCC", 0),
-                    "Prompt Type": prompt_type
-                })
-                aggregated_metrics.append({
-                    "Metric": "Cohen Kappa",
-                    "Value": vulnerability_metrics.get("Cohen Kappa", 0),
-                    "Prompt Type": prompt_type
-                })
-                confusion_matrix_dict[prompt_type] = vulnerability_metrics.get("Confusion Matrix", [])
-
-        # Check if we have the aggregated metrics
-        if not aggregated_metrics:
+        if aggregated_metrics.empty:
             st.warning("No aggregated metrics found in the data.")
             return None, None
 
-        # Create a dataframe for aggregated metrics
-        df = pd.DataFrame(aggregated_metrics)
-
-        # Plot grouped bar chart for aggregated metrics using Plotly
-        fig = px.bar(
-            df,
-            x="Metric",
-            y="Value",
-            color="Prompt Type",
-            barmode="group",
-            title="Aggregated Multiclass Classification Metrics",
-            height=400
+        fig = self.create_grouped_bar_plot(
+            aggregated_metrics, "Metric", "Value", "Prompt Type", "Aggregated Multiclass Classification Metrics"
         )
 
-        # Create confusion matrix plots for each prompt type
         confusion_matrix_figs = []
-        for prompt_type, confusion_matrix in confusion_matrix_dict.items():
-            if confusion_matrix:
-                cm_fig = ff.create_annotated_heatmap(
-                    z=confusion_matrix,
-                    x=[f"Class {i}" for i in range(len(confusion_matrix))],
-                    y=[f"Class {i}" for i in range(len(confusion_matrix))],
-                    colorscale="Viridis",
-                    showscale=True
-                )
-                cm_fig.update_layout(title=f"Confusion Matrix for {prompt_type}")
+        for prompt_type, cm in confusion_matrices.items():
+            if cm:
+                cm_fig = self.create_confusion_matrix_plot(prompt_type, cm)
                 confusion_matrix_figs.append(cm_fig)
 
         return fig, confusion_matrix_figs
 
-    def create_multiclass_classification_plot(self, selected_cwe):
-        # Prepare data for plotting
-        data = []
-        metric_names = ["Accuracy", "Precision", "Recall", "F1-Score"]
+    def extract_aggregated_metrics(self, metrics_to_extract):
+        aggregated_metrics = []
+        confusion_matrices = {}
 
         for (model, prompt_type), metrics in self.model_data.items():
-            if "Vulnerability Type Metrics" in metrics:
-                cwe_metrics = metrics["Vulnerability Type Metrics"]["Using Predicted CWE"]["Per Class Metrics"]
-                for metric in metric_names:
-                    if selected_cwe in cwe_metrics[metric]:
-                        data.append({
-                            "Prompt Type": prompt_type,
-                            "Dataset": metrics.get("Dataset", "Unknown"),
-                            "Metric": metric,
-                            "Value": cwe_metrics[metric].get(selected_cwe, 0)
-                        })
+            vuln_metrics = metrics.get("Vulnerability Type Metrics", {}).get("Using Predicted CWE", {})
+            for metric in metrics_to_extract:
+                value = vuln_metrics.get(metric, 0)
+                aggregated_metrics.append({"Metric": metric, "Value": value, "Prompt Type": prompt_type})
+            confusion_matrices[prompt_type] = vuln_metrics.get("Confusion Matrix", [])
 
-        if not data:
+        return pd.DataFrame(aggregated_metrics), confusion_matrices
+
+    def create_confusion_matrix_plot(self, prompt_type, confusion_matrix):
+        return ff.create_annotated_heatmap(
+            z=confusion_matrix[::-1],
+            x=self.cwe_list,
+            y=self.cwe_list[::-1],
+            colorscale="Viridis",
+            showscale=True
+        ).update_layout(title=f"Confusion Matrix for '{prompt_type}' prompt")
+
+    def create_multiclass_classification_plot(self, selected_cwe):
+        data = self.prepare_cwe_data(selected_cwe)
+        if not data.empty:
+            return self.create_grouped_bar_plot(
+                data, "Dataset", "Value", "Prompt Type", 
+                f"Metrics for CWE Category: {selected_cwe} Grouped by Prompt Type and Dataset", 
+                facet_row="Metric", height=800
+            )
+        else:
             st.warning("No data available for the selected CWE category.")
             return None
 
-        df = pd.DataFrame(data)
+    def prepare_cwe_data(self, selected_cwe):
+        metric_names = ["F1-Score", "Precision", "Recall", "Accuracy"]
+        data = []
+        for (_, prompt_type), metrics in self.model_data.items():
+            vuln_metrics = metrics.get("Vulnerability Type Metrics", {}).get("Using Predicted CWE", {})
+            per_class_metrics = vuln_metrics.get("Per Class Metrics", {})
+            for metric in metric_names:
+                value = per_class_metrics.get(metric, {}).get(selected_cwe, 0)
+                dataset = metrics.get("Dataset", "Unknown")
+                data.append({"Prompt Type": prompt_type, "Dataset": dataset, "Metric": metric, "Value": value})
+        return pd.DataFrame(data) if data else pd.DataFrame()
 
-        # Plot grouped bar chart using Plotly
-        fig = px.bar(
-            df,
-            x="Dataset",
-            y="Value",
-            color="Prompt Type",
-            barmode="group",
-            facet_row="Metric",
-            title=f"Metrics for CWE Category: {selected_cwe} Grouped by Prompt Type and Dataset",
-            height=800
-        )
-
-        return fig
 
 def main():
-    # Specify the directory containing your JSON files
-    data_directory = "Evaluation/exp09/"
-    
-    # Get a list of all JSON files in the directory
-    data_files = [
-        os.path.join(data_directory, file)
-        for file in os.listdir(data_directory)
-        if file.endswith(".json")
-    ]
-    
-    # Initialize the Streamlit handler with the list of files
-    streamlit_handler = StreamlitHandler(data_files)
-    streamlit_handler.run()
+    data_directory = "../Evaluation/exp14/"
+    data_files = [os.path.join(data_directory, file) for file in os.listdir(data_directory) if file.endswith(".json")]
+
+    dashboard_manager = DashboardManager(data_files)
+    dashboard_manager.run()
+
 
 if __name__ == "__main__":
     main()

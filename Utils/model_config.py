@@ -1,16 +1,27 @@
-DATA_DIR_PATH = "CodeExamples"
+import os
 
+DATA_DIR_PATH = "CodeExamples"
 DB_PATH = "LLMsInterface/responses/llms_responses.db"
 
-OPENAI_API_KEY = ""
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-OLLAMA_HOST = "https://hoc-lx-gpu02.ad.iem-hoc.de:8083"
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 
-GROQ_API_KEY = ""
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+OLLAMA_HOST_URL = os.getenv("OLLAMA_HOST_URL")
+HOC_HOST_URL = os.getenv("HOC_HOST_URL")
 
 OPENAI_MODEL_LIST = [
     "gpt-3.5-turbo",
     "gpt-4",
+]
+
+AZURE_OPENAI_MODEL_LIST = [
+    "gpt-4o-2024-05-13",
+    "gpt-4o-mini-2024-07-18",
+    "gpt-35-turbo-16k-0613"
 ]
 
 OLLAMA_MODEL_LIST = [
@@ -29,6 +40,7 @@ OLLAMA_MODEL_LIST = [
     "qwen2:24b",
     "phi3:14b",
     "codellama:7b-instruct-q4_0",
+    "codellama:70b",
     "deepseek-coder-v2:16b-lite-instruct-q4_0",
     "codegemma:7b-instruct-q4_0"
 ]

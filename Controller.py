@@ -92,7 +92,7 @@ class Controller:
         - str: The generated prompt.
 
         """
-        return self.prompt_generator.generate_prompt(code_snippet, prompt_type)
+        return self.prompt_generator.generate_prompt(code_snippet, prompt_type, self.dataset_name)
     
     def send_to_llm(self, model_names: list, prompt_type: str):
         """
@@ -231,22 +231,28 @@ class Controller:
 
 
 if __name__ == '__main__':
-    dataset_name = "cvefixes"
+    dataset_name = "cvefixes_javascript"
     prompt_type = "simple"
     table_name = f"{dataset_name}_{prompt_type}_prompt_test"
     model_names = [model_config.HOC_MODEL_LIST[0]]
     stratification_options = {
         "stratify": True,
         "stratify_cols": ["cwe_name", "cwe"],
-        "test_size": 0.1,
+        "test_size": 0.65,
         "random_state": 12
+    }
+
+    processing_options = {
+        "top_25_cwe": True,
+        "file_examples": True,
+        "method_examples": False
     }
     self_reflection = False
     self_reflection_gt = False
 
     controller = Controller(model_config.DATA_DIR_PATH, dataset_name, table_name, self_reflection=self_reflection, self_reflection_gt=self_reflection_gt)
-    controller.load_examples(stratification_options=stratification_options)
-    controller.examples.to_csv(f'./{table_name}_examples.csv')
+    controller.load_examples(processing_options=processing_options, stratification_options=stratification_options)
+    controller.examples.to_csv(f'./CodeExamples/CVEfixes_v1.0.7/stratified/processed_cvefixes_file_javascript.csv')
     controller.send_to_llm(model_names, prompt_type)
     
     controller.generate_reports(prompt_type, experiment="test")

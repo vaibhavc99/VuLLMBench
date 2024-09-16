@@ -80,104 +80,7 @@ You are an assistant with expertise in identifying and explaining security vulne
   
 If there are no vulnerabilities, enter "N/A" in the other fields. Do not include any additional information in the response. Base your analysis solely on the provided code. If user input is handled and sanitized in the code, then it should not be considered vulnerable. Do not address or give any suggestions outside of the JSON response.
 
-Example 1:
-User Prompt:
-Is there any vulnerability in the following code?
-```java
-import java.io.IOException;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-@WebServlet(value = "/example1")
-public class Example1 extends HttpServlet {{
-
-    private static final long serialVersionUID = 1L;
-
-    @Override
-    public void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {{
-        doPost(request, response);
-    }}
-
-    @Override
-    public void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {{
-        response.setContentType("text/html;charset=UTF-8");
-
-        String param = request.getParameter("input");
-        if (param == null) param = "";
-
-        String bar = doSomething(request, param);
-
-        try {{
-            String sql = "SELECT * from USERS where USERNAME='foo' and PASSWORD='" + bar + "'";
-            org.example.DatabaseHelper.JDBCtemplate.batchUpdate(sql);
-            response.getWriter().println("No results can be displayed for query: " + org.example.Encoder.encodeForHTML(sql) + "<br>" + " because the batchUpdate method doesn't return results.");
-        }} catch (org.springframework.dao.DataAccessException e) {{
-            if (org.example.DatabaseHelper.hideSQLErrors) {{
-                response.getWriter().println("Error processing request.");
-            }} else throw new ServletException(e);
-        }}
-    }}
-
-    private static String doSomething(HttpServletRequest request, String param)
-            throws ServletException, IOException {{
-        String bar;
-        int num = 106;
-        bar = (7 * 18) + num > 200 ? "This_should_always_happen" : param;
-        return bar;
-    }}
-}}
-```
-
-Response:
-```json
-{{
-  "vulnerability": false,
-  "vulnerability_type": "N/A",
-  "vulnerability_name": "N/A"
-}}
-```
-
-Example 2:
-User Prompt:
-Is there any vulnerability in the following code?
-```java
-import java.io.IOException;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-@WebServlet("/example2")
-public class Example2 extends HttpServlet {{
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {{
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
-
-        String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-        
-        try {{
-            // Execute query
-        }} catch (Exception e) {{
-            e.printStackTrace();
-        }}
-    }}
-}}
-```
-
-Response:
-```json
-{{
-  "vulnerability": true,
-  "vulnerability_type": "CWE-89",
-  "vulnerability_name": "SQL Injection"
-}}
-```
+{examples}
 """
 
 FEW_SHOT_USER_PROMPT = SIMPLE_USER_PROMPT
@@ -205,3 +108,470 @@ Do not address or give any suggestions outside of the JSON response.
 """
 
 CHAIN_OF_THOUGHT_USER_PROMPT = SIMPLE_USER_PROMPT
+
+java_examples = """
+Example 1:
+User Prompt:
+Is there any vulnerability in the following code?
+```java
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(value = "/example1")
+public class Example1 extends HttpServlet {
+
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        doPost(request, response);
+    }
+
+    @Override
+    public void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+
+        String param = request.getParameter("input");
+        if (param == null) param = "";
+
+        String bar = doSomething(request, param);
+
+        try {
+            String sql = "SELECT * from USERS where USERNAME='foo' and PASSWORD='" + bar + "'";
+            org.example.DatabaseHelper.JDBCtemplate.batchUpdate(sql);
+            response.getWriter().println("No results can be displayed for query: " + org.example.Encoder.encodeForHTML(sql) + "<br>" + " because the batchUpdate method doesn't return results.");
+        } catch (org.springframework.dao.DataAccessException e) {
+            if (org.example.DatabaseHelper.hideSQLErrors) {
+                response.getWriter().println("Error processing request.");
+            } else throw new ServletException(e);
+        }
+    }
+
+    private static String doSomething(HttpServletRequest request, String param)
+            throws ServletException, IOException {
+        String bar;
+        int num = 106;
+        bar = (7 * 18) + num > 200 ? "This_should_always_happen" : param;
+        return bar;
+    }
+}
+```
+
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+```
+
+Example 2:
+User Prompt:
+Is there any vulnerability in the following code?
+```java
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/example2")
+public class Example2 extends HttpServlet {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String username = request.getParameter("username");
+        String password = request.getParameter("password");
+
+        String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+        
+        try {
+            // Execute query
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-89",
+  "vulnerability_name": "SQL Injection"
+}
+```
+"""
+
+c_examples = """
+Example 1: No Vulnerability (Negative Example)
+User Prompt:
+Is there any vulnerability in the following code?
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+
+int validate_and_convert(const char *input) {
+    // Check if input is a valid integer
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (!isdigit(input[i])) {
+            return -1; // Invalid input
+        }
+    }
+    return atoi(input); // Convert to integer
+}
+
+int main() {
+    char input[20];
+    printf("Enter a number: ");
+    scanf("%19s", input);
+
+    int result = validate_and_convert(input);
+    if (result == -1) {
+        printf("Invalid input detected.\\n");
+    } else {
+        printf("You entered: %d\\n", result);
+    }
+
+    return 0;
+}```
+
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+```
+
+Example 2: Vulnerability Present (Positive Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+int convert_to_int(const char *input) {
+    return atoi(input); // No validation on input
+}
+
+int main() {
+    char input[20];
+    printf("Enter a number: ");
+    scanf("%19s", input);
+
+    int result = convert_to_int(input);
+    printf("You entered: %d\\n", result);
+
+    return 0;
+}
+```
+
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-20",
+  "vulnerability_name": "Improper Input Validation"
+}
+```
+"""
+
+cpp_examples = """
+Example 1: No Vulnerability (Negative Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```cpp
+#include <iostream>
+#include <cstring>
+
+int main() {
+    const int size = 10;
+    char buffer[size];
+
+    // Properly limit the input to avoid out-of-bounds writes
+    std::cout << "Enter a string (max 9 characters): ";
+    std::cin.getline(buffer, size);
+
+    std::cout << "You entered: " << buffer << std::endl;
+
+    return 0;
+}
+```
+
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+```
+
+Example 2: Vulnerability Present (Positive Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```cpp
+#include <iostream>
+#include <cstring>
+
+int main() {
+    char buffer[10];
+
+    // No boundary check, possible out-of-bounds write
+    std::cout << "Enter a string: ";
+    std::cin >> buffer;
+
+    std::cout << "You entered: " << buffer << std::endl;
+
+    return 0;
+}
+```
+
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-787",
+  "vulnerability_name": "Out-of-bounds Write"
+}
+```
+"""
+
+csharp_examples = """
+Example 1: No Vulnerability (Negative Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```csharp
+using System;
+using System.IO;
+
+public class Example1
+{
+    public static void Main(string[] args)
+    {
+        Console.WriteLine("Enter a file name:");
+        string inputFileName = Console.ReadLine();
+
+        string basePath = Path.GetFullPath("C:/files/");
+        string fullPath = Path.GetFullPath(Path.Combine(basePath, inputFileName));
+
+        // Check if the full path is still within the base directory
+        if (fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase))
+        {
+            if (File.Exists(fullPath))
+            {
+                string content = File.ReadAllText(fullPath);
+                Console.WriteLine("File content: " + content);
+            }
+            else
+            {
+                Console.WriteLine("File does not exist.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Invalid file path.");
+        }
+    }
+}
+```
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+```
+
+Example 2: Vulnerability Present (Positive Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```csharp
+using System;
+using System.IO;
+
+public class Example2
+{
+    public static void Main(string[] args)
+    {
+        Console.WriteLine("Enter a file name:");
+        string inputFileName = Console.ReadLine();
+
+        string basePath = "C:/files/";
+        string fullPath = basePath + inputFileName;
+
+        if (File.Exists(fullPath))
+        {
+            string content = File.ReadAllText(fullPath);
+            Console.WriteLine("File content: " + content);
+        }
+        else
+        {
+            Console.WriteLine("File does not exist.");
+        }
+    }
+}
+```
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-22",
+  "vulnerability_name": "Path Traversal"
+}
+```
+"""
+
+javascript_examples = """
+Example 1: No Vulnerability (Negative Example)
+User Prompt:
+Is there any vulnerability in the following code?
+```javascript
+var commentSection = document.getElementById("commentSection");
+
+function sanitizeInput(input) {
+    // Create a temporary DOM element to escape HTML characters
+    var tempDiv = document.createElement('div');
+    tempDiv.textContent = input; // Automatically escapes dangerous characters
+    return tempDiv.innerHTML;
+}
+
+function addComment() {
+    var userInput = document.getElementById("userComment").value;
+    
+    // Sanitize the input before adding to the page
+    var safeInput = sanitizeInput(userInput);
+
+    var newComment = document.createElement("p");
+    newComment.innerHTML = safeInput;  // Safely displays the sanitized input
+    commentSection.appendChild(newComment);
+}
+
+document.getElementById("submitComment").addEventListener("click", function() {
+    addComment();
+});
+```
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+```
+
+Example 2: Vulnerability Present (Positive Example)
+
+User Prompt:
+Is there any vulnerability in the following code?
+```javascript
+var commentSection = document.getElementById("commentSection");
+
+function addComment() {
+    var userInput = document.getElementById("userComment").value;
+
+    // Directly inserting user input into the DOM without sanitization
+    var newComment = document.createElement("p");
+    newComment.innerHTML = userInput;  // Potential XSS vulnerability
+    commentSection.appendChild(newComment);
+}
+
+document.getElementById("submitComment").addEventListener("click", function() {
+    addComment();
+});
+```
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-79",
+  "vulnerability_name": "Cross-site Scripting (XSS)"
+}
+```
+"""
+
+
+python_examples = """
+Example 1: No Vulnerability (Negative Example)**
+User Prompt:
+Is there any vulnerability in the following code?
+```python
+import requests
+from urllib.parse import urlparse
+
+def is_safe_url(url):
+    # Only allow URLs with specific allowed domains
+    allowed_domains = ['trusted.com', 'example.com']
+    
+    parsed_url = urlparse(url)
+    if parsed_url.netloc in allowed_domains:
+        return True
+    return False
+
+def fetch_data(url):
+    if is_safe_url(url):
+        try:
+            response = requests.get(url)
+            return response.text
+        except requests.exceptions.RequestException as e:
+            return f"Error fetching the data: {str(e)}"
+    else:
+        return "Invalid URL or domain not allowed"
+
+# Example usage
+user_input_url = input("Enter a URL to fetch data from: ")
+result = fetch_data(user_input_url)
+print(result)
+```
+Response:
+```json
+{
+  "vulnerability": false,
+  "vulnerability_type": "N/A",
+  "vulnerability_name": "N/A"
+}
+
+Example 2: Vulnerability Present (Positive Example)**
+User Prompt:
+Is there any vulnerability in the following code?
+```python
+import requests
+
+def fetch_data(url):
+    try:
+        # No validation, allowing any URL to be fetched
+        response = requests.get(url)
+        return response.text
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching the data: {str(e)}"
+
+# Example usage
+user_input_url = input("Enter a URL to fetch data from: ")
+result = fetch_data(user_input_url)
+print(result)
+```
+Response:
+```json
+{
+  "vulnerability": true,
+  "vulnerability_type": "CWE-918",
+  "vulnerability_name": "Server-Side Request Forgery (SSRF)"
+}
+
+"""

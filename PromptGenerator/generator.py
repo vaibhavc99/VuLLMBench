@@ -20,13 +20,14 @@ class PromptGenerator:
             "self_reflection_with_ground_truth": prompt_templates.SELF_REFLECTION_WITH_GROUND_TRUTH_PROMPT
         }
 
-    def generate_prompt(self, code_snippet, prompt_type):
+    def generate_prompt(self, code_snippet, prompt_type, dataset_name=None):
         """
         Generates a prompt based on the given code snippet and prompt type.
 
         Parameters:
         - code_snippet (str): The code snippet to be included in the prompt.
         - prompt_type (str): The type of prompt to be generated.
+        - dataset_name (str): The name of the dataset to be used in the prompt.
 
         Returns:
         - str: The formatted prompt based on the specified type.
@@ -45,8 +46,17 @@ class PromptGenerator:
                 ("human", user_prompt)
             ]
         )
-
-        final_prompt = chat_template.format_messages(cwe_list=cwe_lists.cwe_owasp, code=code_snippet)
+        
+        if prompt_type == "few_shot":
+            if dataset_name.lower().startswith('cvefixes'):
+                language = dataset_name.split('_')[-1]
+                examples = getattr(prompt_templates, f"{language}_examples", None)
+                final_prompt = chat_template.format_messages(examples=examples, code=code_snippet)
+            else:
+                final_prompt = chat_template.format_messages(examples=prompt_templates.java_examples, code=code_snippet)
+        else:
+            final_prompt = chat_template.format_messages(cwe_list=cwe_lists.cwe_owasp, code=code_snippet)
+        
         return final_prompt
     
     def generate_self_reflection_prompt(self, chat_history):
@@ -98,5 +108,5 @@ class PromptGenerator:
 
 if __name__ == "__main__":
     gen = PromptGenerator()
-    messages = gen.generate_prompt("def foo(): pass", "simple")
+    messages = gen.generate_prompt("def foo(): pass", "few_shot", "cvefixes_cpp")
     print(messages)

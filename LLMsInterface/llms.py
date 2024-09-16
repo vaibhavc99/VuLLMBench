@@ -54,7 +54,7 @@ class LLMs:
         elif model_name in self.config.OLLAMA_MODEL_LIST:
             if model_name not in self.ollama_checked:
                 self.ollama_checked.add(model_name)
-                host = OllamaUtils(self.config.OLLAMA_HOST)
+                host = OllamaUtils(self.config.OLLAMA_HOST_URL)
                 if not host.model_available(model_name):
                     return None
             
@@ -115,11 +115,11 @@ class LLMs:
                 error_message = str(e)
                 self.logger.error(f"Error invoking model: {error_message}")
                 
-                if "max_tokens" in error_message:
+                if any(x in error_message for x in ["max_tokens", "maximum context length", "400"]):
                     self.logger.error("max_tokens error encountered, returning None.")
                     return None
-                self.logger.info(f"Retrying after 5 seconds...")
-                time.sleep(5)
+                self.logger.info(f"Retrying after 2 seconds...")
+                time.sleep(2)
 
     def query_llms(self, prompts_per_model: dict):
         """
@@ -185,6 +185,7 @@ class LLMs:
                     if model_name in self.config.AZURE_OPENAI_MODEL_LIST:
                         self.logger.info(f"Model {model_name} executed {len(prompts)} prompts in {elapsed_time}")
                         self.logger.info(f"Total cost: {self.total_cost} USD, Total tokens: {self.total_tokens}, Prompt tokens: {self.prompt_tokens}, Completion tokens: {self.completion_tokens}")
+                        self.total_cost, self.total_tokens, self.prompt_tokens, self.completion_tokens = 0.0, 0, 0, 0
                     else:
                         self.logger.info(f"Model {model_name} executed {len(prompts)} prompts in {elapsed_time}")
 

@@ -59,5 +59,5 @@ HOC_MODEL_LIST = [
 
 MODEL_PARAMETERS = {
                         "temperature": 0,
-                        "max_tokens": 50
+                        "max_tokens": 75
                     }

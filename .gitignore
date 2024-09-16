@@ -3,5 +3,8 @@
 __pycache__
 Data/
 *.log
-Evaluation
+Evaluation*
 processed*
+.env
+tables
+figures

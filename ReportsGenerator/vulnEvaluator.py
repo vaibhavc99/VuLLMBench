@@ -78,7 +78,7 @@ class VulnerabilityEvaluator:
         """
         try:
             y_true = df['real_vulnerability'].astype(bool)
-            y_pred = df['predicted_vulnerability']
+            y_pred = df['predicted_vulnerability'].astype(bool)
 
             accuracy = accuracy_score(y_true, y_pred)
             precision = precision_score(y_true, y_pred, zero_division=0)  # Positive Predictive Value

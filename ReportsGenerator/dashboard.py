@@ -6,6 +6,7 @@ import plotly.io as pio
 import psutil
 
 from visualizer import Visualizer
+from best_f1s import BestF1s
 
 # Set the default Plotly template
 pio.templates.default = "plotly_white"
@@ -13,7 +14,7 @@ pio.templates.default = "plotly_white"
 class DashboardManager:
     def __init__(self, eval_dirs, output_dir):
         self.data = self.load_and_aggregate_data(eval_dirs)
-        self.model_list = {model for model, _, _ in self.data.keys()}
+        self.model_list = {model for model, _, _, _ in self.data.keys()}
         self.cwe_list = self.get_cwe_list()
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -24,8 +25,8 @@ class DashboardManager:
             vulnerability_metrics = model_data.get("Vulnerability Type Metrics", {})
             predicted_cwe_metrics = vulnerability_metrics.get("Using Predicted CWE", {})
             per_class_metrics = predicted_cwe_metrics.get("Per Class Metrics", {})
-            accuracy_metrics = per_class_metrics.get("Accuracy", {})
-            cwe_set.update(accuracy_metrics.keys())
+            f1_scores = per_class_metrics.get("F1-Score", {})
+            cwe_set.update(f1_scores.keys())
         sorted_cwe_list = sorted(list(cwe_set), key=lambda cwe: int(cwe.split('-')[1]))
         return sorted_cwe_list
 
@@ -37,12 +38,27 @@ class DashboardManager:
     def load_and_aggregate_data(self, dirs):
         aggregated_data = {}
         for exp_dir in dirs:
+            dir_name = os.path.basename(exp_dir).lower()
+            # Determine programs type based on directory name
+            if 'obfs' in dir_name or 'obfuscated' in dir_name:
+                programs_type = 'obfuscated'
+            elif 'original' in dir_name:
+                programs_type = 'original'
+            elif 'method' in dir_name:
+                programs_type = 'method-based'
+            else:
+                programs_type = 'original'
+
             for file in os.listdir(exp_dir):
                 if file.endswith(".json"):
                     data = self.load_data(os.path.join(exp_dir, file))
-                    experiment_type = "obfuscated" if "obfs" in exp_dir else "regular"
                     for model, model_results in data.items():
-                        id = (model, model_results.get("Prompt Type"), experiment_type)
+                        prompt_type = model_results.get("Prompt Type", "Unknown")
+                        dataset = model_results.get("Dataset", "Unknown")
+                        id = (model, prompt_type, dataset, programs_type)
+                        # Add 'Programs Type' and 'Dataset (Programs Type)' to model_results
+                        model_results['Programs Type'] = programs_type
+                        model_results['Benchmark Programs (Type)'] = f"{dataset} ({programs_type})"
                         if id in aggregated_data:
                             aggregated_data[id].update(model_results)
                         else:
@@ -88,9 +104,12 @@ class DashboardManager:
         if self.selected_model == "Aggregated Results":
             model_data = self.data
         else:
-            model_data = {key: value for key, value in self.data.items() if key[0] == self.selected_model}
+            model_data = {
+                key: value for key, value in self.data.items() if key[0] == self.selected_model
+            }
 
         metrics_visualizer = Visualizer(model_data, self.cwe_list, self.output_dir)
+        bestf1_scores = BestF1s(model_data, self.cwe_list, self.output_dir)
 
         if classification_type == "Binary Classification":
             st.markdown(
@@ -102,6 +121,13 @@ class DashboardManager:
             col1, col2 = st.columns(2)
             self.render_binary_classification(metrics_visualizer, col1, col2)
 
+            # Save best F1 scores
+            bestf1_scores.get_best_f1_score_per_model_for_binary()
+            # bestf1_scores.get_f1_per_prompt_and_model_binary()
+            # bestf1_scores.get_f1_per_prompt_and_self_reflection("binary")
+            # bestf1_scores.plot_overall_sast_vs_top5_llms()
+            # bestf1_scores.plot_sast_vs_top5_llms_per_cwe()
+
         elif classification_type == "Multiclass Classification":
             st.markdown(
                 "<h2 style='text-align: center;'>Vulnerability Type Classification Metrics</h2>",
@@ -110,6 +136,11 @@ class DashboardManager:
             st.markdown("<br><br>", unsafe_allow_html=True)
 
             self.render_multiclass_classification(metrics_visualizer, selected_cwe)
+
+            # Save best F1 scores
+            bestf1_scores.get_best_f1_score_per_model_for_multiclass()
+            # bestf1_scores.get_f1_per_prompt_and_model_multiclass()
+            # bestf1_scores.get_f1_per_prompt_and_self_reflection("multiclass")
 
         # Exit button at the sidebar
         st.sidebar.markdown(12 * "<br>", unsafe_allow_html=True)
@@ -126,9 +157,9 @@ class DashboardManager:
 
         if figures:
             if aggregated and display_option == "Individual Metrics":
-                # Display figures for each dataset
+                # Display figures for each Dataset (Exp Type)
                 for dataset_name, fig in figures.items():
-                    st.subheader(f"Dataset: {dataset_name}")
+                    st.subheader(f"Benchmark Programs and Type: {dataset_name}")
                     st.plotly_chart(fig, use_container_width=True)
             elif aggregated and display_option == "Aggregated Metrics":
                 # Display figures for each prompt type
@@ -136,7 +167,7 @@ class DashboardManager:
                     st.subheader(f"Prompt Type: {prompt_type_name}")
                     st.plotly_chart(fig, use_container_width=True)
             elif not aggregated and display_option == "Individual Metrics":
-                # Individual model selected, display as before
+                # Individual model selected, display metrics
                 metrics_list = list(figures.keys())
                 for i, metric in enumerate(metrics_list):
                     if i % 2 == 0:
@@ -148,9 +179,9 @@ class DashboardManager:
                             st.subheader(metric)
                             st.plotly_chart(figures[metric])
             else:  # not aggregated and display_option == "Aggregated Metrics"
-                # Individual model selected, prompt type as colors, x as metrics, facet row as dataset
+                # Individual model selected, prompt type as colors, x as metrics, facet row as Dataset (Programs Type)
                 for dataset_name, fig in figures.items():
-                    st.subheader(f"Dataset: {dataset_name}")
+                    st.subheader(f"Benchmark Programs and Type: {dataset_name}")
                     st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("No figures to display.")
@@ -168,7 +199,7 @@ class DashboardManager:
                 figures = metrics_visualizer.create_multiclass_classification_plots_for_cwe(selected_cwe)
                 if figures:
                     for dataset_name, fig in figures.items():
-                        st.subheader(f"Dataset: {dataset_name}")
+                        st.subheader(f"Benchmark Programs and Type: {dataset_name}")
                         st.plotly_chart(fig, use_container_width=True)
         else:
             if selected_cwe == "Aggregated Metrics":
@@ -186,18 +217,21 @@ class DashboardManager:
                 fig = metrics_visualizer.create_multiclass_classification_plot(selected_cwe)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
-
+                else:
+                    st.warning("No figures to display.")
 
 def start_dashboard(eval_dir, output_dir):
+    # Include all subdirectories in eval_dir
     eval_dirs = [
         os.path.join(eval_dir, dir_name) for dir_name in os.listdir(eval_dir)
-        if os.path.isdir(os.path.join(eval_dir, dir_name)) and ('exp' in dir_name)
+        if os.path.isdir(os.path.join(eval_dir, dir_name))
     ]
 
     dashboard = DashboardManager(eval_dirs, output_dir)
     dashboard.run()
 
 if __name__ == "__main__":
-    eval_dir = "Evaluation/"
+    # eval_dir = "Eval-results-CVEfixes/Evaluation-cvefixes-js"
+    eval_dir = "Eval-results-OWASP/Evaluation-reg-obfs"
     output_dir = "ReportsGenerator/figures"
     start_dashboard(eval_dir, output_dir)

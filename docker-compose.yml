@@ -9,6 +9,8 @@ services:
       - ./Evaluation:/vullmbench/Evaluation
       - ./CodeExamples:/vullmbench/CodeExamples
       - ./LLMsInterface/responses:/vullmbench/LLMsInterface/responses
+    env_file:
+      - .env
     environment:
       - EXPERIMENT=exp01
     command: python VuLLMBench.py -e ${EXPERIMENT}

@@ -149,11 +149,11 @@ def parse_arguments():
     Returns:
     - Parsed arguments
     """
-    parser = argparse.ArgumentParser(description='Vulnerability Detection Benchmark')
+    parser = argparse.ArgumentParser(description='VuLLMBench - Vulnerability Detection Benchmark for Large Language Models')
     parser.add_argument('-d', '--data', help='Path to the directory containing the data (Code Examples)', default='./CodeExamples')
     parser.add_argument('--dataset_name', help='Name of the dataset to use', default='owasp')
-    parser.add_argument('-m', '--model_names', nargs='+', help='Names of the models to use', default=['llama3-8b-8192'])
-    parser.add_argument('--prompt_types', nargs='+', choices=['simple', 'vulnerability_specific', 'vulnerability_names', 'explanatory_insights', 'solution_oriented'], help='Types of prompts to use for LLM queries', default=['simple'])
+    parser.add_argument('-m', '--model_names', nargs='+', help='Names of the models to use', default=['llama3.1:8b'])
+    parser.add_argument('--prompt_types', nargs='+', choices=['simple', 'vulnerability_specific', 'few_shot', 'chain_of_thought', 'holistic_vulnerability_analysis'], help='Types of prompts to use for LLM queries', default=['simple'])
     parser.add_argument('--no_cache', action='store_true', help='Do not use cache')
     parser.add_argument('-e', '--experiment', help='Name of the experiment to execute. The name must correspond to one directory in the Evaluation directory which contains a configuration file')
     parser.add_argument('--processing_options', nargs='*', choices=PROCESSING_OPTIONS, help='Processing options to apply for the examples', default=['remove_multiline_comments'])

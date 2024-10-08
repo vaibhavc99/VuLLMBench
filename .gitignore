@@ -1,0 +1,12 @@
+*.DS_Store
+*.db
+__pycache__
+Data/
+*.log
+Evaluation*
+processed*
+.env
+tables
+figures*
+Eval-DFs*
+Eval-results*

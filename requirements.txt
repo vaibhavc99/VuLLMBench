@@ -1,0 +1,11 @@
+pandas
+openai
+ollama
+langchain
+langchain-community
+langchain-openai
+langchain-groq
+scikit-learn
+javalang
+plotly
+streamlit

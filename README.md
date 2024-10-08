@@ -1,93 +1,302 @@
-# MA_Chaudhari_LLM-Benchmark
+# VuLLMBench
 
+## Overview
 
+VuLLMBench is a benchmarking platform designed to evaluate the vulnerability detection capabilities of Large Language Models (LLMs) on code examples. It uses code examples from datasets like OWASP Benchmark and CVEFixes, it allows for customizable preprocessing of code examples, generates prompts using various prompting strategies, queries multiple LLMs, parses and evaluates responses, and generates evaluation reports. An interactive dashboard is also available for detailed analysis.
 
-## Getting started
+## Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.cc-asp.fraunhofer.de/iem_paderborn/oe300/abschlussarbeiten/ma_chaudhari_llm-benchmark.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.cc-asp.fraunhofer.de/iem_paderborn/oe300/abschlussarbeiten/ma_chaudhari_llm-benchmark/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- **Multiple Datasets Support**: Works with OWASP Benchmark and CVEFixes datasets.
+- **Preprocessing of Code Examples**: Apply customizable preprocessing (obfuscation, code cleaning) steps before evaluation.
+- **Stratified Sampling**: Sample code examples based on criteria like vulnerability types.
+- **Prompt Generation**: Create different prompt types for LLMs.
+- **LLM Integration**: Interface with multiple LLMs for querying.
+- **Response Parsing and Evaluation**: Analyze and evaluate LLM responses.
+- **Reporting**: Generate detailed evaluation reports.
+- **Interactive Dashboard**: Visualize results and insights.
+- **Docker Support**: Easily deploy and run the benchmark platform using Docker or Docker Compose.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+### Prerequisites
+
+- **Docker** and **Docker Compose** (for Docker deployment)
+- **Python 3.10** or higher (for manual installation)
+- **Git** (for cloning the repository)
+
+### Clone the Repository
+
+```bash
+git clone https://gitlab.cc-asp.fraunhofer.de/iem_paderborn/oe300/abschlussarbeiten/ma_chaudhari_llm-benchmark.git
+```
+
+### Environment Variables
+
+VuLLMBench requires certain environment variables to be set for API keys and endpoints depending on the LLMs to be used:
+
+- `OPENAI_API_KEY`
+- `GROQ_API_KEY`
+- `AZURE_OPENAI_API_KEY`
+- `AZURE_OPENAI_API_VERSION`
+- `AZURE_OPENAI_ENDPOINT`
+- `OLLAMA_HOST_URL`
+- `HOC_HOST_URL`
+
+These variables can be stored in a `.env` file in the project root directory or exported as environment variables in the shell.
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+VuLLMBench can be run using Docker or directly via the command line interface (CLI).
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### Running an Experiment with Docker
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Experiments can be run using either Docker CLI or Docker Compose.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+#### Using Docker CLI
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+First, build the Docker image:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+docker build -t vullmbench .
+```
 
-## License
-For open source projects, say how it is licensed.
+Run an experiment using:
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+docker run --name vullmbench \
+  -e EXPERIMENT=exp01 \
+  --env-file .env \
+  -v $(pwd)/Evaluation:/vullmbench/Evaluation \
+  -v $(pwd)/CodeExamples:/vullmbench/CodeExamples \
+  -v $(pwd)/LLMsInterface/responses:/vullmbench/LLMsInterface/responses \
+  vullmbench
+```
+
+- Replace `exp01` with the name of the experiment.
+- Ensure that the required environment variables are set, either by using the `--env-file .env` option or by exporting them.
+
+#### Using Docker Compose
+
+First, build the Docker Compose services:
+
+```bash
+docker compose build
+```
+
+Run the experiment:
+
+```bash
+EXPERIMENT=exp01 docker compose up
+```
+
+- Set the `EXPERIMENT` environment variable to specify the experiment name.
+- Docker Compose will use the configuration in the `docker-compose.yml` file.
+
+### Running an Experiment via CLI
+
+To run the benchmark without Docker:
+
+#### Manual Installation
+
+1. **Create a Virtual Environment**
+
+   ```bash
+   python3 -m venv vullmbench-venv
+   source vullmbench-venv/bin/activate
+   ```
+
+2. **Install Required Packages**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set Environment Variables**
+
+   Ensure that the required environment variables are set, either by creating a `.env` file or exporting them in the shell.
+
+#### Run the Experiment
+
+Execute the benchmark using:
+
+```bash
+python VuLLMBench.py -e exp01
+```
+
+- Replace `exp01` with the name of the experiment.
+- Additional command-line arguments can be passed as needed (see below).
+
+### Command-line Arguments
+
+- `-d`, `--data`: Path to the directory containing the data (Code Examples). **Default**: `./CodeExamples`
+- `--dataset_name`: Name of the dataset to use (`owasp` or `cvefixes_<language>`). **Default**: `owasp`
+- `-m`, `--model_names`: Names of the models to use.
+- `--prompt_types`: Types of prompts to use for LLM queries.
+
+  **Choices**:
+
+  - `simple`
+  - `vulnerability_specific`
+  - `few_shot`
+  - `chain_of_thought`
+  - `holistic_vulnerability_analysis`
+
+  **Default**: `['simple']`
+
+- `--no_cache`: Do not use cache. By default, caching is enabled to reuse previous LLM responses.
+- `-e`, `--experiment`: Name of the experiment to execute. Must correspond to a directory in the `Evaluation` directory containing a configuration file.
+- `--processing_options`: Processing options to apply to the examples.
+
+  **Choices**:
+
+  - `obfuscate_code`
+  - `remove_multiline_comments`
+  - `remove_import_statements`
+  - `remove_package_declarations`
+  - `replace_benchmark_names`
+  - `replace_cwe_names`
+
+  **Default**: `['remove_multiline_comments']`
+
+- `--self_reflection`: Enable self-reflection on LLM responses.
+- `--self_reflection_gt`: Enable self-reflection on LLM responses with ground truth.
+- `--dashboard`: Run the Evaluation dashboard.
+
+## Experiment Configuration
+
+When running experiments using the `--experiment` option, specify configurations in an `experiment.conf` file located in the corresponding directory under `Evaluation`.
+
+### Example `experiment.conf`
+
+```ini
+[General]
+use_cache = True
+prompt_type = simple, vulnerability_specific
+logging = debug
+dataset_name = owasp
+self_reflection = False
+
+[Preprocessing Options]
+obfuscate_code = True
+remove_multiline_comments = True
+replace_cwe_names = True
+
+[Data Stratification]
+stratify = True
+stratify_by = category, cwe
+test_size = 0.2
+random_state = 12
+
+[LLM]
+model_names = gpt-4o-2024-05-13, llama3.1:70b
+```
+
+## Project Structure
+
+A brief overview of the important files and their purposes:
+
+- [`VuLLMBench.py`](VuLLMBench.py): The main script that orchestrates the benchmark, handling argument parsing and execution flow.
+- [`Controller.py`](Controller.py): Manages the overall workflow of the benchmark process.
+- [`LLMsInterface/llms.py`](LLMsInterface/llms.py): Handles interactions with various LLMs, supports both sequential and parallel processing of prompts.
+- [`LLMsInterface/ollama_utils.py`](LLMsInterface/ollama_utils.py): Provides utility functions for the Ollama server.
+- [`LLMsInterface/responseDB.py`](LLMsInterface/responseDB.py): Manages LLM responses using a SQLite database.
+- [`LLMsInterface/responses/llms_responses.db`](LLMsInterface/responses/llms_responses.db): SQLite database for storing LLM responses.
+- [`Preprocessor/owasp_processor.py`](Preprocessor/owasp_processor.py): Processes OWASP code examples with preprocessing and caching.
+- [`Preprocessor/owasp_cache.py`](Preprocessor/owasp_cache.py): Manages caching for processed OWASP examples.
+- [`Preprocessor/obfuscation.py`](Preprocessor/obfuscation.py): Performs code obfuscation to anonymize code.
+- [`Preprocessor/cvefixes_processor.py`](Preprocessor/cvefixes_processor.py): Processes CVEFixes code examples.
+- [`Preprocessor/stratification.py`](Preprocessor/stratification.py): Creates balanced test sets through data stratification.
+- [`PromptGenerator/generator.py`](PromptGenerator/generator.py): Generates prompts based on predefined templates.
+- [`PromptGenerator/prompt_templates.py`](PromptGenerator/prompt_templates.py): Contains prompt templates for different types.
+- [`PromptGenerator/cwe_lists.py`](PromptGenerator/cwe_lists.py): Contains lists of CWEs for prompt generation.
+- [`ReportsGenerator/vulnEvaluator.py`](ReportsGenerator/vulnEvaluator.py): Evaluates LLM performance and computes metrics.
+- [`ReportsGenerator/responseParser.py`](ReportsGenerator/responseParser.py): Parses and structures LLM response data.
+- [`ReportsGenerator/dashboard.py`](ReportsGenerator/dashboard.py): Manages the interactive evaluation dashboard.
+- [`ReportsGenerator/visualizer.py`](ReportsGenerator/visualizer.py): Generates plots for the dashboard using Plotly.
+- [`Utils/model_config.py`](Utils/model_config.py): Contains configuration settings for models.
+- [`Utils/configure_logging.py`](Utils/configure_logging.py): Sets up logging configurations.
+- [`Utils/cvefixes_extractor.py`](Utils/cvefixes_extractor.py): Extracts code examples from the CVEFixes database.
+
+## Data Preparation
+
+Ensure that the data directory (default `./CodeExamples`) contains the datasets to be used.
+
+### Supported Datasets
+
+- **OWASP Benchmark Project**: [Link](https://github.com/OWASP-Benchmark/BenchmarkJava/tree/master/src/main/java/org/owasp/benchmark/testcode)
+
+  - Download the OWASP Benchmark code examples and place it in `./CodeExamples/OWASP`.
+
+- **CVEfixes Dataset**: [Link](https://zenodo.org/records/7029359)
+
+  - Download the CVEFixes dataset and place it in `./CodeExamples/CVEfixes_v1.0.7`.
+
+#### Extracting Code Examples from CVEFixes
+
+After downloading the CVEFixes dataset, run the `cvefixes_extractor` to extract the code examples.
+
+To run the extractor:
+
+```bash
+python Utils/cvefixes_extractor.py
+```
+
+This will generate CSV files containing the extracted code examples, which can then be used by VuLLMBench.
+
+## Reports and Evaluation
+
+After running the benchmark, reports are generated and saved in the `Evaluation` directory under the specified experiment.
+
+### Reports Include
+
+- Evaluation metrics for each model and prompt type.
+- DataFrames used for evaluation (true and predicted).
+- Logs of other metrics (runtime, costs).
+
+## Dashboard
+
+An interactive dashboard is available to visualize and analyze the results.
+
+### Launch the Dashboard via CLI
+
+```bash
+python VuLLMBench.py --dashboard
+```
+
+### Running the Dashboard with Docker
+
+#### Using Docker CLI
+
+```bash
+docker run --name vullmbench_dashboard \
+  -p 8501:8501 \
+  --env-file .env \
+  -v $(pwd)/Evaluation:/vullmbench/Evaluation \
+  vullmbench \
+  python VuLLMBench.py --dashboard
+```
+
+#### Using Docker Compose
+
+Override the default command to run the dashboard:
+
+```bash
+docker compose run --service-ports vullmbench python VuLLMBench.py --dashboard
+```
+
+Access the dashboard at `http://localhost:8501`.
+
+### Features
+
+- **Model Selection**: Choose between aggregated results or individual models.
+- **Classification Type**: Toggle between binary and multiclass classification metrics.
+- **Interactive Plots**: Visualize metrics with interactive Plotly charts.
+- **Customization**: Select specific CWEs or prompts for detailed metrics.
+- **Export Options**: Save figures and data for reporting purposes.
+
+## Logging
+
+Logs are saved in the `Evaluation/<experiment>` directory with the name `<experiment>.log`.
+
+- **Standard Output**: Info and error messages are printed to the console.
+- **Log File**: Detailed logs are written to the log file for debugging and record-keeping.

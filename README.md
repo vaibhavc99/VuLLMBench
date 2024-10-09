@@ -27,7 +27,7 @@ VuLLMBench is a benchmarking platform designed to evaluate the vulnerability det
 ### Clone the Repository
 
 ```bash
-git clone https://gitlab.cc-asp.fraunhofer.de/iem_paderborn/oe300/abschlussarbeiten/ma_chaudhari_llm-benchmark.git
+git clone https://github.com/vaibhavc99/VuLLMBench.git
 ```
 
 ### Environment Variables

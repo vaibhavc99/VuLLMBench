@@ -21,7 +21,10 @@ OPENAI_MODEL_LIST = [
 AZURE_OPENAI_MODEL_LIST = [
     "gpt-4o-2024-05-13",
     "gpt-4o-mini-2024-07-18",
-    "gpt-35-turbo-16k-0613"
+    "gpt-35-turbo-16k-0613",
+    "o3-mini-2025-01-31",
+    "gpt-5-2025-08-07",
+    "gpt-5-mini-2025-08-07"
 ]
 
 OLLAMA_MODEL_LIST = [
@@ -42,7 +45,13 @@ OLLAMA_MODEL_LIST = [
     "codellama:7b-instruct-q4_0",
     "codellama:70b",
     "deepseek-coder-v2:16b-lite-instruct-q4_0",
-    "codegemma:7b-instruct-q4_0"
+    "codegemma:7b-instruct-q4_0",
+    "deepseek-r1:latest",
+    "granite3.3:8b",
+    "deepcoder:14b",
+    "gpt-oss:20b",
+    "llama3.2:3b",
+    "qwen3-coder:30b"
 ]
 
 GROQ_MODEL_LIST = [
@@ -59,5 +68,5 @@ HOC_MODEL_LIST = [
 
 MODEL_PARAMETERS = {
                         "temperature": 0,
-                        "max_tokens": 75
+                        "max_tokens": 2048,
                     }

@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from langchain_groq import ChatGroq
 from langchain_community.callbacks import get_openai_callback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,12 +43,16 @@ class LLMs:
             )
                     
         elif model_name in self.config.AZURE_OPENAI_MODEL_LIST:
+            if model_name.startswith("o"):
+                temperature=None
+            else:
+                temperature=self.config.MODEL_PARAMETERS["temperature"]
             model = AzureChatOpenAI(
                 azure_endpoint=self.config.AZURE_OPENAI_ENDPOINT,
                 azure_deployment=model_name,
                 api_key=self.config.AZURE_OPENAI_API_KEY,
                 api_version=self.config.AZURE_OPENAI_API_VERSION,
-                temperature=self.config.MODEL_PARAMETERS["temperature"]
+                temperature=temperature
             )
 
         elif model_name in self.config.OLLAMA_MODEL_LIST:

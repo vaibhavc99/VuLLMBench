@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   vullmbench:
     build: .
@@ -9,6 +7,7 @@ services:
       - ./Evaluation:/vullmbench/Evaluation
       - ./CodeExamples:/vullmbench/CodeExamples
       - ./LLMsInterface/responses:/vullmbench/LLMsInterface/responses
+      - ./Utils/model_config.py:/vullmbench/Utils/model_config.py
     env_file:
       - .env
     environment:

@@ -77,12 +77,6 @@ docker run --name vullmbench \
 
 #### Using Docker Compose
 
-First, build the Docker Compose services:
-
-```bash
-docker compose build
-```
-
 Run the experiment:
 
 ```bash

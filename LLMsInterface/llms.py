@@ -43,17 +43,23 @@ class LLMs:
             )
                     
         elif model_name in self.config.AZURE_OPENAI_MODEL_LIST:
-            if model_name.startswith("o"):
-                temperature=None
+            if model_name.startswith(("o", "gpt-5")):
+                model = AzureChatOpenAI(
+                    azure_endpoint=self.config.AZURE_OPENAI_ENDPOINT,
+                    azure_deployment=model_name,
+                    api_key=self.config.AZURE_OPENAI_API_KEY,
+                    api_version=self.config.AZURE_OPENAI_API_VERSION,
+                    temperature=None,
+                    reasoning_effort="minimal",
+                )
             else:
-                temperature=self.config.MODEL_PARAMETERS["temperature"]
-            model = AzureChatOpenAI(
-                azure_endpoint=self.config.AZURE_OPENAI_ENDPOINT,
-                azure_deployment=model_name,
-                api_key=self.config.AZURE_OPENAI_API_KEY,
-                api_version=self.config.AZURE_OPENAI_API_VERSION,
-                temperature=temperature
-            )
+                model = AzureChatOpenAI(
+                    azure_endpoint=self.config.AZURE_OPENAI_ENDPOINT,
+                    azure_deployment=model_name,
+                    api_key=self.config.AZURE_OPENAI_API_KEY,
+                    api_version=self.config.AZURE_OPENAI_API_VERSION,
+                    temperature=self.config.MODEL_PARAMETERS["temperature"]
+                )
 
         elif model_name in self.config.OLLAMA_MODEL_LIST:
             if model_name not in self.ollama_checked:
